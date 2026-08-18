@@ -149,16 +149,18 @@ docker exec chessapp-postgres pg_isready -U chessapp -d chessapp
 
 Expected: the service reports `healthy`, and `pg_isready` prints `accepting connections`. If the container restarts repeatedly, read `docker logs chessapp-postgres` before changing anything.
 
-- [ ] **Step 5: Verify data survives a restart**
+- [ ] **Step 5: Verify data survives the container being destroyed**
 
 ```bash
 docker exec chessapp-postgres psql -U chessapp -d chessapp -c "create table scaffold_check (id int); insert into scaffold_check values (1);"
-docker compose -f infra/docker-compose.yml restart
-sleep 10
-docker exec chessapp-postgres psql -U chessapp -d chessapp -c "select count(*) from scaffold_check;"
+docker compose -f infra/docker-compose.yml down
+docker compose -f infra/docker-compose.yml up -d --wait
+docker exec chessapp-postgres psql -U chessapp -d chessapp -tAc "select count(*) from scaffold_check;"
 ```
 
-Expected: the count is `1`. This proves the named volume is mounted at the right path — if the volume path were wrong, the table would be gone.
+Expected: the count is `1`. `down` removes the container but keeps the named volume, so the row can only survive if the volume is mounted at the path PostgreSQL 18 actually writes to. Use `down`, not `restart` — a restart reuses the same container, so its data would survive even with no volume at all, and the check would prove nothing.
+
+`up --wait` blocks until the healthcheck passes, so no `sleep` is needed.
 
 - [ ] **Step 6: Remove the check table**
 
