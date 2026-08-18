@@ -20,4 +20,9 @@ management:
         include: health,info
   endpoint:
     health:
-      show-details: always
+      # Never expose datasource, disk or SSL detail to an unauthenticated
+      # caller. With no security on the classpath yet this behaves as "never";
+      # once authentication exists it starts serving details to authorised
+      # users without a further config change.
+      # Local development overrides this to "always" in application-local.yml.
+      show-details: when-authorized

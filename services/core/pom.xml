@@ -93,6 +93,16 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <!--
+                      mvn spring-boot:run is a local-development command, so it
+                      activates the local profile. Packaged artifacts are
+                      unaffected and keep the safe defaults.
+                    -->
+                    <profiles>
+                        <profile>local</profile>
+                    </profiles>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

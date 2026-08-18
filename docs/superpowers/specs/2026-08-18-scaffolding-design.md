@@ -83,7 +83,19 @@ pattern. Empty directories are noise and git does not track them anyway.
 ### Health
 
 Health is served by Actuator at `/actuator/health`, with the database health
-indicator enabled and `show-details: always` for local development.
+indicator enabled.
+
+`show-details` is `when-authorized` by default, so an unauthenticated caller
+receives the overall status and nothing else — no datasource details, disk paths
+or free-space figures. With no security on the classpath this behaves as
+`never`; once authentication exists (see the auth issue) it begins serving
+details to authorised users with no further configuration change.
+
+Local development overrides this to `always` in `application-local.yml`. The
+`spring-boot-maven-plugin` is configured to activate the `local` profile, so
+`mvn spring-boot:run` gets full detail while a packaged artifact keeps the safe
+default. The default is what a deployed environment inherits, so the default is
+the one that must be safe.
 
 No hand-written health controller. Actuator already reports datasource
 connectivity, and writing a controller to duplicate it would invent a module

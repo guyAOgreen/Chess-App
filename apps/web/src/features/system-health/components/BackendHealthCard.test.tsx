@@ -21,6 +21,14 @@ describe('BackendHealthCard', () => {
     expect(screen.getByText(/db: UP/i)).toBeInTheDocument();
   });
 
+  it('reports the status when the backend withholds component detail', () => {
+    // Outside local development the backend answers with status only, because
+    // health details are not exposed to an unauthenticated caller.
+    render(<BackendHealthCard state={{ kind: 'ready', health: { status: 'UP' } }} />);
+    expect(screen.getByText(/backend: UP/i)).toBeInTheDocument();
+    expect(screen.queryByRole('listitem')).not.toBeInTheDocument();
+  });
+
   it('reports why the backend could not be reached', () => {
     render(<BackendHealthCard state={{ kind: 'unreachable', message: 'Failed to fetch' }} />);
     expect(screen.getByText(/backend unreachable/i)).toBeInTheDocument();

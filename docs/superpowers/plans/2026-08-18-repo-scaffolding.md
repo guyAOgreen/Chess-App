@@ -51,6 +51,7 @@ java -version    # need 25; 21 means the backend cannot be verified
 | `services/core/pom.xml` | Backend build definition and dependencies |
 | `services/core/src/main/java/com/chessapp/ChessAppApplication.java` | Spring Boot entry point |
 | `services/core/src/main/resources/application.yml` | Datasource, JPA, Flyway and Actuator configuration |
+| `services/core/src/main/resources/application-local.yml` | Local-development overrides (full Actuator health detail) |
 | `services/core/src/main/resources/db/migration/.gitkeep` | Holds the Flyway location so it exists before the first migration |
 | `services/core/src/test/java/com/chessapp/ApplicationContextIT.java` | Boots the context against a real PostgreSQL |
 | `apps/web/vite.config.ts` | Build config, dev proxy to the backend, Vitest config |
@@ -341,6 +342,16 @@ Expected: FAIL — there is no `pom.xml` yet, so Maven reports it cannot find th
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <!--
+                      mvn spring-boot:run is a local-development command, so it
+                      activates the local profile. Packaged artifacts are
+                      unaffected and keep the safe defaults.
+                    -->
+                    <profiles>
+                        <profile>local</profile>
+                    </profiles>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -407,7 +418,12 @@ management:
         include: health,info
   endpoint:
     health:
-      show-details: always
+      # Never expose datasource, disk or SSL detail to an unauthenticated
+      # caller. With no security on the classpath yet this behaves as "never";
+      # once authentication exists it starts serving details to authorised
+      # users without a further config change.
+      # Local development overrides this to "always" in application-local.yml.
+      show-details: when-authorized
 ```
 
 The defaults match `infra/docker-compose.yml` exactly, so a developer who has started the compose file needs no environment variables. `open-in-view` is disabled because leaving the persistence session open across view rendering hides lazy-loading problems.

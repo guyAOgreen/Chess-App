@@ -46,6 +46,13 @@ The backend reads its datasource from `SPRING_DATASOURCE_URL`,
 `SPRING_DATASOURCE_USERNAME` and `SPRING_DATASOURCE_PASSWORD`, defaulting to the
 compose values, so no environment setup is needed for local work.
 
+### Profiles
+
+`mvn spring-boot:run` activates the `local` profile, which turns on full
+Actuator health detail. By default — and therefore in any deployed environment —
+`/actuator/health` returns the overall status only, with no datasource, disk or
+SSL detail, because nothing authenticates callers yet.
+
 ## Tests
 
     mvn -f services/core/pom.xml verify     # needs Docker for Testcontainers
