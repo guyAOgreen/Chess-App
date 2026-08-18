@@ -14,7 +14,7 @@
 
 - Base package and Maven groupId: `com.chessapp`. Backend artifactId: `core`.
 - Java version: **25**. Spring Boot parent version: **4.1.0**.
-- PostgreSQL: **18**, database `chessapp`, user `chessapp`, password `chessapp` (local development only).
+- PostgreSQL: **18**, database `chessapp`, user `chessapp`, password `chessapp` (local development only), published on host port **5433**.
 - Yarn **classic** (1.22), not Berry.
 - **No domain code.** No `Player`, `Game`, `GameImport`, PGN parsing, or chess rules library.
 - **No empty domain packages.** The backend contains only `ChessAppApplication`. Feature packages arrive with the first real feature.
@@ -73,7 +73,7 @@ java -version    # need 25; 21 means the backend cannot be verified
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: a PostgreSQL 18 instance on `localhost:5432`, database `chessapp`, user `chessapp`, password `chessapp`. Task 2 configures the backend against exactly these values.
+- Produces: a PostgreSQL 18 instance on `localhost:5433`, database `chessapp`, user `chessapp`, password `chessapp`. Task 2 configures the backend against exactly these values.
 
 - [ ] **Step 1: Confirm you are on the feature branch**
 
@@ -124,7 +124,10 @@ services:
       POSTGRES_USER: chessapp
       POSTGRES_PASSWORD: chessapp
     ports:
-      - "5432:5432"
+      # Published on 5433 because a native PostgreSQL install commonly occupies
+      # 5432 on developer machines, and a client connecting from the host would
+      # silently reach that instance instead of this container.
+      - "5433:5432"
     volumes:
       - chessapp-postgres-data:/var/lib/postgresql
     healthcheck:
@@ -187,7 +190,7 @@ git commit -m "chore: add gitignore and local PostgreSQL 18 compose file"
 - Test: `services/core/src/test/java/com/chessapp/ApplicationContextIT.java`
 
 **Interfaces:**
-- Consumes: the PostgreSQL instance from Task 1 (`localhost:5432`, `chessapp`/`chessapp`/`chessapp`).
+- Consumes: the PostgreSQL instance from Task 1 (`localhost:5433`, `chessapp`/`chessapp`/`chessapp`).
 - Produces: an application listening on port 8080 serving `GET /actuator/health`, which returns JSON of the shape `{"status":"UP","components":{"db":{"status":"UP",...}}}` and answers **503** with the same JSON shape when a component is DOWN. Task 4's frontend depends on both that path and that shape.
 
 **Every Maven step in this task requires JDK 25.** See "Known blocker" above.
@@ -284,9 +287,15 @@ Expected: FAIL — there is no `pom.xml` yet, so Maven reports it cannot find th
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
+        <!--
+          Spring Boot 4 splits autoconfiguration into per-technology modules.
+          flyway-core alone puts the library on the classpath but leaves it
+          inert: no migration runs and no schema history table is created.
+          spring-boot-starter-flyway is what brings the autoconfiguration.
+        -->
         <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-core</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
         </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>
@@ -380,7 +389,7 @@ spring:
   application:
     name: chess-app-core
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/chessapp}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/chessapp}
     username: ${SPRING_DATASOURCE_USERNAME:chessapp}
     password: ${SPRING_DATASOURCE_PASSWORD:chessapp}
   jpa:

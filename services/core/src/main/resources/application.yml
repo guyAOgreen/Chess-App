@@ -2,7 +2,7 @@ spring:
   application:
     name: chess-app-core
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/chessapp}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/chessapp}
     username: ${SPRING_DATASOURCE_USERNAME:chessapp}
     password: ${SPRING_DATASOURCE_PASSWORD:chessapp}
   jpa:

@@ -39,9 +39,15 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
+        <!--
+          Spring Boot 4 splits autoconfiguration into per-technology modules.
+          flyway-core alone puts the library on the classpath but leaves it
+          inert: no migration runs and no schema history table is created.
+          spring-boot-starter-flyway is what brings the autoconfiguration.
+        -->
         <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-core</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
         </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>

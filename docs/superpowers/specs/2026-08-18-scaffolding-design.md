@@ -67,7 +67,7 @@ Deliberately absent, per "create components only when they become necessary":
 | `spring-boot-starter-validation` | request validation |
 | `spring-boot-starter-actuator` | health and info endpoints |
 | `postgresql` | JDBC driver (runtime) |
-| `flyway-core`, `flyway-database-postgresql` | schema migrations |
+| `spring-boot-starter-flyway`, `flyway-database-postgresql` | schema migrations |
 | `spring-boot-starter-test` | test harness |
 | `testcontainers-junit-jupiter`, `testcontainers-postgresql` | database integration tests |
 
@@ -96,7 +96,7 @@ with defaults matching `infra/docker-compose.yml`, so a local developer needs
 no environment setup:
 
 ```text
-SPRING_DATASOURCE_URL      default jdbc:postgresql://localhost:5432/chessapp
+SPRING_DATASOURCE_URL      default jdbc:postgresql://localhost:5433/chessapp
 SPRING_DATASOURCE_USERNAME default chessapp
 SPRING_DATASOURCE_PASSWORD default chessapp
 ```
@@ -158,7 +158,10 @@ configuring CORS in development entirely.
 PostgreSQL 18 only:
 
 * named volume for data;
-* port 5432;
+* published on host port **5433**, not 5432 — a native PostgreSQL install
+  frequently occupies 5432 on a developer machine, and a client connecting from
+  the host reaches that instance instead of the container, failing with a
+  confusing authentication error rather than a connection refusal;
 * database `chessapp`, user `chessapp`, password `chessapp` — local development
   credentials, never used in a deployed environment.
 

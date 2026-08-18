@@ -6,8 +6,11 @@ services:
       POSTGRES_DB: chessapp
       POSTGRES_USER: chessapp
       POSTGRES_PASSWORD: chessapp
+    # Published on 5433 because a native PostgreSQL install commonly occupies
+    # 5432 on developer machines, and a client connecting from the host would
+    # silently reach that instance instead of this container.
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - chessapp-postgres-data:/var/lib/postgresql
     healthcheck:
