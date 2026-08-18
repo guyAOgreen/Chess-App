@@ -493,8 +493,10 @@ yarn install
 - [ ] **Step 2: Add test and formatting tooling**
 
 ```bash
-yarn add --dev vitest jsdom @testing-library/react @testing-library/jest-dom @testing-library/user-event prettier
+yarn add --dev vitest jsdom @testing-library/react @testing-library/jest-dom @testing-library/dom @testing-library/user-event prettier
 ```
+
+`@testing-library/dom` is a peer dependency of `@testing-library/jest-dom`. Yarn 1 does not install peer dependencies automatically, so omitting it fails at test time with `Cannot find package '@testing-library/dom'`.
 
 - [ ] **Step 3: Create the feature-first directory structure**
 
@@ -1018,7 +1020,7 @@ Do not describe the backend as working if it was never built.
 | No MinIO | not created — correct |
 | Success criteria 1–4 | 1, 2, 3, 4, 5 |
 
-ESLint comes with the Vite `react-ts` template and needs no separate task.
+Linting comes with the Vite `react-ts` template and needs no separate task. Current templates ship **oxlint** (`.oxlintrc.json`, `yarn lint`) rather than ESLint; the spec named ESLint, but the template's own choice is the one to keep.
 
 **Deviation from spec:** the health UI lives under `src/features/system-health/` rather than leaving `src/features/` empty. Rationale is in the File Structure section.
 
