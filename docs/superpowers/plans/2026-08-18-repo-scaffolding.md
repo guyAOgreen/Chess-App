@@ -309,14 +309,20 @@ Expected: FAIL — there is no `pom.xml` yet, so Maven reports it cannot find th
             <artifactId>spring-boot-testcontainers</artifactId>
             <scope>test</scope>
         </dependency>
+        <!--
+          Testcontainers 2.x (managed by the Spring Boot 4.1 BOM) prefixes every
+          module artifactId with "testcontainers-". The 1.x names
+          (junit-jupiter, postgresql) are not managed by the BOM and fail
+          resolution with a missing-version error.
+        -->
         <dependency>
             <groupId>org.testcontainers</groupId>
-            <artifactId>junit-jupiter</artifactId>
+            <artifactId>testcontainers-junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
-            <artifactId>postgresql</artifactId>
+            <artifactId>testcontainers-postgresql</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -414,7 +420,25 @@ mvn -f services/core/pom.xml verify
 
 Expected: PASS. `ApplicationContextIT` starts a PostgreSQL 18 container, boots the full Spring context against it, and asserts the connection is valid. Docker must be running.
 
-If this fails with `invalid target release: 25`, stop and consult the "Known blocker" section — do not change `java.version`.
+If this fails with `release version 25 not supported`, stop and consult the "Known blocker" section — do not change `java.version` in the pom.
+
+Two checks are still available without JDK 25, and both should be run so the backend is not left entirely unverified:
+
+1. Confirm the classes the test imports exist in the resolved jars:
+
+```bash
+jar tf ~/.m2/repository/org/testcontainers/testcontainers-junit-jupiter/*/testcontainers-junit-jupiter-*.jar | grep "junit/jupiter/Testcontainers.class"
+jar tf ~/.m2/repository/org/testcontainers/testcontainers-postgresql/*/testcontainers-postgresql-*.jar | grep "containers/PostgreSQLContainer.class"
+jar tf ~/.m2/repository/org/springframework/boot/spring-boot-testcontainers/*/spring-boot-testcontainers-*.jar | grep "service/connection/ServiceConnection.class"
+```
+
+2. Run the build with the release overridden **on the command line only**, which leaves the pom untouched:
+
+```bash
+mvn -f services/core/pom.xml verify -Djava.version=21
+```
+
+This exercises the Spring context, Hibernate, Flyway, Actuator and Testcontainers for real. A pass here means everything except the Java 25 toolchain itself is proven — say exactly that, and do not report it as "the build passes".
 
 - [ ] **Step 8: Verify the running application serves health**
 

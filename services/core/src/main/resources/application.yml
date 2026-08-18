@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: chess-app-core
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/chessapp}
+    username: ${SPRING_DATASOURCE_USERNAME:chessapp}
+    password: ${SPRING_DATASOURCE_PASSWORD:chessapp}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
