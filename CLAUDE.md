@@ -6,13 +6,13 @@ This file defines how Claude should work in this repository.
 
 Before implementing a feature or making an architectural decision:
 
-1. Read `context.md`.
+1. Read `CONTEXT.md`.
 2. Inspect the relevant existing code.
 3. Understand the affected domain and service boundaries.
 4. Prefer the simplest design that satisfies the current requirement.
 5. Do not introduce future complexity unless there is a clear current need.
 
-`context.md` is the source of truth for the product direction and architectural intent.
+`CONTEXT.md` is the source of truth for the product direction and architectural intent.
 
 ---
 
@@ -448,7 +448,7 @@ The intended high-level repository structure is:
 ├── packages/
 ├── infra/
 ├── CLAUDE.md
-└── context.md
+└── CONTEXT.md
 ```
 
 Not every directory needs to exist immediately.
@@ -1051,7 +1051,7 @@ If duplicated logic is security-sensitive or determines canonical chess state, t
 
 # Documentation
 
-Update `context.md` when a decision materially changes:
+Update `CONTEXT.md` when a decision materially changes:
 
 * product scope;
 * architecture;
@@ -1060,7 +1060,7 @@ Update `context.md` when a decision materially changes:
 * service boundaries;
 * major workflow.
 
-Do not use `context.md` as a running implementation log.
+Do not use `CONTEXT.md` as a running implementation log.
 
 Important architectural decisions that require detailed reasoning may later be captured as ADRs under:
 
