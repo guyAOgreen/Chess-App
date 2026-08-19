@@ -500,7 +500,12 @@ This is a possible evolution, not the required starting architecture.
 Java 25
 Spring Boot 4.x
 Maven
+chesslib
 ```
+
+Chess move legality, SAN parsing, FEN handling and PGN reading use `chesslib`,
+wrapped behind interfaces owned by the core service. See
+`docs/adr/0001-java-chess-rules-library.md`.
 
 The core backend owns:
 
