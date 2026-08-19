@@ -1,0 +1,9 @@
+# Local development only. Activated by the spring-boot-maven-plugin
+# configuration, so `mvn spring-boot:run` picks it up automatically.
+#
+# Full health detail is useful when running the stack by hand; it must not be
+# the default, because the default is what a deployed environment inherits.
+management:
+  endpoint:
+    health:
+      show-details: always
