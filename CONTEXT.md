@@ -185,7 +185,7 @@ Chess.com username
 
 A confirmed chess game.
 
-A Game should contain canonical PGN plus searchable metadata.
+A Game should contain canonical moves plus searchable metadata.
 
 Potential metadata includes:
 
@@ -193,17 +193,28 @@ Potential metadata includes:
 id
 whitePlayerId
 blackPlayerId
+whiteName
+blackName
 whiteRating
 blackRating
 event
 site
 round
-playedAt
+playedOn
 result
 eco
 source
-pgn
+movetext
+sourcePgn
 ```
+
+The canonical PGN document is assembled from the metadata plus `movetext` rather
+than stored, so tag pairs cannot drift from the columns they come from.
+Game-time player-name snapshots supply the PGN `White` and `Black` tags, while the
+player identifiers support identity and search; renaming a Player therefore does
+not rewrite historical exports.
+`sourcePgn` keeps the exact submitted document as provenance and is never read to
+answer a product question. See `docs/adr/0002-game-storage.md`.
 
 Possible sources include:
 
