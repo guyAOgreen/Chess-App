@@ -6,6 +6,8 @@ Status: Accepted
 
 Issue: [#2](https://github.com/guyAOgreen/Chess-App/issues/2)
 
+Chess terminology used here is defined in the [glossary](../glossary.md).
+
 ## Context
 
 Chess legality and PGN construction must be deterministic. The core service needs
