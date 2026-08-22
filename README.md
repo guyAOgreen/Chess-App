@@ -2,8 +2,9 @@
 
 Chess game storage, scoresheet digitisation and opponent preparation.
 
-See [CONTEXT.md](CONTEXT.md) for product direction and architecture, and
-[CLAUDE.md](CLAUDE.md) for development conventions.
+See [CONTEXT.md](CONTEXT.md) for product direction and architecture,
+[CLAUDE.md](CLAUDE.md) for development conventions, and
+[docs/glossary.md](docs/glossary.md) for the chess terminology used throughout.
 
 ## Layout
 

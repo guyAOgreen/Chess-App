@@ -4,6 +4,9 @@
 
 Chess Prep is a chess game storage, digitisation and opponent-preparation application.
 
+Chess terminology used throughout this document is defined in
+[docs/glossary.md](docs/glossary.md).
+
 The project began from a personal need to store chess games in a searchable database and convert handwritten chess scoresheets into PGNs.
 
 The longer-term goal is to support opponent preparation using:

@@ -6,6 +6,8 @@ Status: Accepted
 
 Issue: [#3](https://github.com/guyAOgreen/Chess-App/issues/3)
 
+Chess terminology used here is defined in the [glossary](../glossary.md).
+
 ## Context
 
 A confirmed game has one canonical PGN, searchable metadata is stored separately,
