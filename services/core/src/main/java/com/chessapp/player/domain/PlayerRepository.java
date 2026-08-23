@@ -25,11 +25,13 @@ public interface PlayerRepository {
      * case is not a conflict by this method's contract: nothing is inserted, so
      * nothing collides.
      *
-     * <p><b>Calling this inside an existing transaction detaches every entity
-     * already loaded there</b> (the persistence adapter's upsert must clear the
-     * persistence context so the read afterwards sees the just-inserted row).
-     * A caller that holds other entities across this call must re-read anything
-     * it intends to mutate afterwards.
+     * <p>Safe to call part-way through your own unit of work: entities you have
+     * already loaded stay managed, and you need declare nothing special on your
+     * own {@code @Transactional} boundary. The one thing to know is that
+     * resolving a player commits independently of your transaction, so a player
+     * created here survives a later rollback of yours. That is intended — a
+     * {@link Player} is shared reference data rather than part of any one
+     * aggregate, and resolution is idempotent, so the row is simply reused.
      *
      * @throws PlayerIdentityConflict only when a NEW display name is being
      *                                inserted and the candidate's FIDE ID already
