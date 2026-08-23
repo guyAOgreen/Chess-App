@@ -207,27 +207,23 @@ row committed by the concurrent winner would be invisible and the read would com
 back empty. Any future change to the transaction isolation of this path breaks it,
 so the constraint is asserted by the concurrency test rather than left implicit.
 
-That requirement has a real cost for callers. `createOrFind` declares
-`@Transactional(isolation = Isolation.READ_COMMITTED)`, but under Spring's default
-`REQUIRED` propagation that attribute only takes effect when this method starts the
-transaction. A caller that opens its own transaction first — PGN import (#7), for
-example — makes `createOrFind` join that transaction instead, and a joined
-transaction keeps whatever isolation it was opened with. `PlayerPersistenceConfiguration`
-configures the transaction manager to validate existing transactions rather than let
-that happen silently, so any caller wrapping `createOrFind` in its own transaction
-must also declare `isolation = Isolation.READ_COMMITTED`. A caller that joins with a
-different level, or with no isolation declared at all, fails fast at the point it
-joins with:
+`REQUIRES_NEW` is what makes that requirement real rather than inherited. Spring
+honours a declared isolation level only on the transaction it actually starts, so
+under the default `REQUIRED` propagation a caller's open transaction would be joined
+and the level declared here silently ignored. Starting a new transaction keeps the
+requirement inside the adapter.
 
-```
-org.springframework.transaction.IllegalTransactionStateException: Participating
-transaction with definition [PROPAGATION_REQUIRED,ISOLATION_READ_COMMITTED]
-specifies isolation level which is incompatible with existing transaction: (unknown)
-```
+An earlier version of this design instead kept `REQUIRED` and configured the
+transaction manager to validate existing transactions. That worked, but it put a
+player-specific requirement into global configuration and obliged every caller —
+including any future module that merely happens to call this repository — to declare
+`isolation = Isolation.READ_COMMITTED` on its own boundary or fail at runtime. The
+concern belongs in the adapter, not in every caller.
 
-This is deliberate: failing loudly beats silently running the upsert under the
-wrong guarantee. #5 and #7 must declare `isolation = Isolation.READ_COMMITTED` on
-any transaction that calls into `createOrFind`.
+The trade-off `REQUIRES_NEW` does carry: resolving a player commits independently of
+the caller, so an import that fails afterwards leaves the player row behind. That is
+intended. A `Player` is shared reference data rather than part of any one game,
+resolution is idempotent, and the next import of that name reuses the row.
 
 `ON CONFLICT` targets only `display_name`. A collision on `fide_id` for a different
 display name is not a find-or-create race; it means the supplied identity data is
@@ -272,15 +268,19 @@ merely that neither threw. Without separate connections there is no race to test
 because a single connection serialises the statements.
 
 This test exercises the `READ COMMITTED` assumption above, but it cannot pin it by
-itself: it calls `createOrFind` with no outer transaction open, so `createOrFind`
-always starts its own transaction and the isolation attribute always applies. A
-regression that only breaks when a caller joins an existing transaction at a
-different isolation level — the case PGN import (#7) introduces — would not be
-visible to this test at all. That gap is closed structurally rather than by a test:
-`PlayerPersistenceConfiguration` configures the transaction manager to validate
-existing transactions, so a caller joining `createOrFind` with a mismatched
-isolation level now fails fast with `IllegalTransactionStateException` instead of
-silently running under the wrong guarantee.
+itself: it calls `createOrFind` with no outer transaction open, so the isolation
+attribute always applies. `PlayerTransactionBoundaryIT` covers the case it cannot —
+a caller with a plain `@Transactional` of its own, which is what PGN import (#7)
+will be. It asserts two things that together pin the adapter's contract: that such a
+caller succeeds without declaring any isolation level, and that an entity it loaded
+before the call is still managed afterwards.
+
+That second assertion exists because the adapter once cleared the persistence
+context as a side effect of its insert, which would have detached everything the
+caller had loaded and silently dropped any change made to those entities afterwards.
+The clear was unnecessary: the read that follows is a derived query, which goes to
+the database rather than the first-level cache, and no managed instance can shadow a
+row the context has never seen.
 
 ## Risks
 

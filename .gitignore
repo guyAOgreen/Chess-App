@@ -24,3 +24,6 @@ Thumbs.db
 
 # Subagent-driven development scratch (ledgers, briefs, review packages)
 .superpowers/
+
+# Stray Maven repo left by tooling; never part of the repository
+.m2-review/

@@ -8,6 +8,7 @@ import java.util.Optional;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Repository
@@ -38,32 +39,23 @@ class PlayerRepositoryAdapter implements PlayerRepository {
      * REPEATABLE READ it would not be, and this method would return empty,
      * surfacing as {@code IllegalStateException("player vanished between insert
      * and read")} below — a message pointing at a phantom delete rather than at
-     * the real cause. The isolation level is a requirement, not an incidental
-     * detail, so it is pinned explicitly here rather than left to inherit
-     * PostgreSQL's default (which happens to also be READ COMMITTED, but nothing
-     * would stop that default from changing under this code).
+     * the real cause.
      *
-     * <p>The {@code isolation} attribute above only takes effect when this method
-     * starts the transaction. Under Spring's default {@code REQUIRED} propagation,
-     * a caller that opens its own transaction first and then calls this method
-     * makes it join that transaction instead — and a joined transaction keeps the
-     * isolation level it was opened with, silently ignoring the one declared here.
-     * {@link PlayerPersistenceConfiguration} closes that gap: it configures the
-     * transaction manager to validate existing transactions, so a caller that
-     * joins with a different isolation level now fails fast with an
-     * {@code IllegalTransactionStateException} instead of quietly running under
-     * the wrong guarantee.
+     * <p>{@code REQUIRES_NEW} is what makes that guarantee real. Spring honours a
+     * declared isolation level only on the transaction it actually starts, so
+     * under the default {@code REQUIRED} propagation a caller's open transaction
+     * would be joined and the level here silently ignored. Starting a new
+     * transaction keeps the requirement inside this adapter, where it belongs,
+     * instead of obliging every caller to declare the same level.
      *
-     * <p><b>Caution for callers already inside a transaction:</b> see
-     * {@link PlayerJpaRepository#insertIfAbsent} — this method clears the
-     * persistence context as a side effect.
-     *
-     * <p><b>If you call this from within your own {@code @Transactional} method,
-     * that method must also declare {@code isolation = Isolation.READ_COMMITTED}</b>,
-     * or joining this transaction will fail with {@code IllegalTransactionStateException}.
+     * <p>The trade-off is that resolving a player commits independently of the
+     * caller: a subsequently failed import leaves the player row behind. That is
+     * intended. A {@code Player} is shared reference data rather than part of any
+     * one game, resolution is idempotent, and the next import of that name reuses
+     * the row.
      */
     @Override
-    @Transactional(isolation = Isolation.READ_COMMITTED)
+    @Transactional(propagation = Propagation.REQUIRES_NEW, isolation = Isolation.READ_COMMITTED)
     public Player createOrFind(NewPlayer candidate) {
         try {
             jpa.insertIfAbsent(candidate.displayName(), candidate.fideId(), candidate.federation());
