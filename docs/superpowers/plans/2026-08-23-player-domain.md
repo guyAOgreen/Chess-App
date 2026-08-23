@@ -132,7 +132,7 @@ The migration lands before any Java, so later tasks have a schema to validate ag
 
 **Interfaces:**
 - Consumes: nothing
-- Produces: table `players` with columns `id, display_name, fide_id, federation, created_at, updated_at`; unique indexes `players_display_name_idx` and `players_fide_id_idx`; check constraints `players_display_name_trimmed`, `players_display_name_not_blank`, `players_display_name_not_unknown`, `players_fide_id_digits`, `players_federation_format`
+- Produces: table `players` with columns `id, display_name, fide_id, federation, created_at`; unique indexes `players_display_name_idx` and `players_fide_id_idx`; check constraints `players_display_name_trimmed`, `players_display_name_not_blank`, `players_display_name_not_unknown`, `players_fide_id_digits`, `players_federation_format`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -286,7 +286,6 @@ CREATE TABLE players (
     fide_id      TEXT        NULL,
     federation   TEXT        NULL,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT players_display_name_trimmed     CHECK (display_name = btrim(display_name)),
     CONSTRAINT players_display_name_not_blank   CHECK (btrim(display_name) <> ''),
     CONSTRAINT players_display_name_not_unknown CHECK (display_name <> '?'),

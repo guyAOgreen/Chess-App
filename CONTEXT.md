@@ -182,7 +182,7 @@ Lichess username
 Chess.com username
 ```
 
-Identity is the exact, trimmed `displayName`, enforced by a unique constraint;
+Identity is the exact, trimmed `displayName`, enforced by a unique index;
 `Green, Guy` and `green, guy` are different players, and matching two names as the
 same person is the alias problem, not this constraint. `?`, the PGN unknown-player
 marker, is rejected rather than stored — there is no shared placeholder `Player` for

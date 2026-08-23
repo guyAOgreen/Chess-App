@@ -207,6 +207,28 @@ row committed by the concurrent winner would be invisible and the read would com
 back empty. Any future change to the transaction isolation of this path breaks it,
 so the constraint is asserted by the concurrency test rather than left implicit.
 
+That requirement has a real cost for callers. `createOrFind` declares
+`@Transactional(isolation = Isolation.READ_COMMITTED)`, but under Spring's default
+`REQUIRED` propagation that attribute only takes effect when this method starts the
+transaction. A caller that opens its own transaction first — PGN import (#7), for
+example — makes `createOrFind` join that transaction instead, and a joined
+transaction keeps whatever isolation it was opened with. `PlayerPersistenceConfiguration`
+configures the transaction manager to validate existing transactions rather than let
+that happen silently, so any caller wrapping `createOrFind` in its own transaction
+must also declare `isolation = Isolation.READ_COMMITTED`. A caller that joins with a
+different level, or with no isolation declared at all, fails fast at the point it
+joins with:
+
+```
+org.springframework.transaction.IllegalTransactionStateException: Participating
+transaction with definition [PROPAGATION_REQUIRED,ISOLATION_READ_COMMITTED]
+specifies isolation level which is incompatible with existing transaction: (unknown)
+```
+
+This is deliberate: failing loudly beats silently running the upsert under the
+wrong guarantee. #5 and #7 must declare `isolation = Isolation.READ_COMMITTED` on
+any transaction that calls into `createOrFind`.
+
 `ON CONFLICT` targets only `display_name`. A collision on `fide_id` for a different
 display name is not a find-or-create race; it means the supplied identity data is
 inconsistent. The adapter translates that specific constraint violation into

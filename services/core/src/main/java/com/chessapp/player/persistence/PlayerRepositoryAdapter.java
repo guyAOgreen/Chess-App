@@ -57,6 +57,10 @@ class PlayerRepositoryAdapter implements PlayerRepository {
      * <p><b>Caution for callers already inside a transaction:</b> see
      * {@link PlayerJpaRepository#insertIfAbsent} — this method clears the
      * persistence context as a side effect.
+     *
+     * <p><b>If you call this from within your own {@code @Transactional} method,
+     * that method must also declare {@code isolation = Isolation.READ_COMMITTED}</b>,
+     * or joining this transaction will fail with {@code IllegalTransactionStateException}.
      */
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
