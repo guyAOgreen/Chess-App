@@ -38,6 +38,9 @@ final class PlayerValues {
             return null;
         }
         String trimmed = raw.trim();
+        if (PGN_UNKNOWN.equals(trimmed)) {
+            return null;
+        }
         if (!DIGITS.matcher(trimmed).matches()) {
             throw new IllegalArgumentException("fideId must contain digits only, was: " + raw);
         }
@@ -49,6 +52,9 @@ final class PlayerValues {
             return null;
         }
         String trimmed = raw.trim();
+        if (PGN_UNKNOWN.equals(trimmed)) {
+            return null;
+        }
         if (!FEDERATION.matcher(trimmed).matches()) {
             throw new IllegalArgumentException(
                     "federation must be three uppercase letters, was: " + raw);

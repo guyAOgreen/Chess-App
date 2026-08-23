@@ -1,12 +1,13 @@
 package com.chessapp.player.persistence;
 
 import java.util.Optional;
-import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.UUID;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
-interface PlayerJpaRepository extends JpaRepository<PlayerEntity, java.util.UUID> {
+interface PlayerJpaRepository extends Repository<PlayerEntity, UUID> {
 
     Optional<PlayerEntity> findByDisplayName(String displayName);
 

@@ -132,7 +132,7 @@ The migration lands before any Java, so later tasks have a schema to validate ag
 
 **Interfaces:**
 - Consumes: nothing
-- Produces: table `players` with columns `id, display_name, fide_id, federation, created_at, updated_at`; unique indexes `players_display_name_key` and `players_fide_id_key`; check constraints `players_display_name_trimmed`, `players_display_name_not_blank`, `players_display_name_not_unknown`, `players_fide_id_digits`, `players_federation_format`
+- Produces: table `players` with columns `id, display_name, fide_id, federation, created_at, updated_at`; unique indexes `players_display_name_idx` and `players_fide_id_idx`; check constraints `players_display_name_trimmed`, `players_display_name_not_blank`, `players_display_name_not_unknown`, `players_fide_id_digits`, `players_federation_format`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -211,7 +211,7 @@ class PlayerSchemaIT {
         insert("Green, Guy", null, "ENG");
 
         assertThatThrownBy(() -> insert("Green, Guy", null, "RSA"))
-                .hasMessageContaining("players_display_name_key");
+                .hasMessageContaining("players_display_name_idx");
     }
 
     @Test
@@ -219,7 +219,7 @@ class PlayerSchemaIT {
         insert("Smith, John", "2000123", null);
 
         assertThatThrownBy(() -> insert("Smith, J.", "2000123", null))
-                .hasMessageContaining("players_fide_id_key");
+                .hasMessageContaining("players_fide_id_idx");
     }
 
     @Test
@@ -294,10 +294,10 @@ CREATE TABLE players (
     CONSTRAINT players_federation_format        CHECK (federation IS NULL OR federation ~ '^[A-Z]{3}$')
 );
 
-CREATE UNIQUE INDEX players_display_name_key ON players (display_name);
+CREATE UNIQUE INDEX players_display_name_idx ON players (display_name);
 
 -- Partial: most players have no FIDE ID, and NULLs must not collide.
-CREATE UNIQUE INDEX players_fide_id_key ON players (fide_id) WHERE fide_id IS NOT NULL;
+CREATE UNIQUE INDEX players_fide_id_idx ON players (fide_id) WHERE fide_id IS NOT NULL;
 ```
 
 - [ ] **Step 4: Run the tests to verify they pass**
@@ -902,7 +902,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 class PlayerRepositoryAdapter implements PlayerRepository {
 
-    private static final String FIDE_ID_INDEX = "players_fide_id_key";
+    private static final String FIDE_ID_INDEX = "players_fide_id_idx";
 
     private final PlayerJpaRepository jpa;
 

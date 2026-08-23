@@ -235,6 +235,16 @@ never by an implicit rewrite on read or on write.
   reserved placeholder `Player` belongs to the `Player` model (#4) and the import
   endpoint (#7). M1's workflow is a user importing their own games, which carry
   names; the case becomes real with reference-game import (M5).
+
+  **Settled by #4** (see the
+  [player domain design](../superpowers/specs/2026-08-22-player-domain-design.md)):
+  there is no placeholder `Player`. `?` cannot be stored as a `display_name` — the
+  domain rejects it and a database `CHECK` constraint enforces the same rule
+  directly — so a game whose `White` or `Black` tag is unknown is rejected by
+  import rather than resolved to a shared placeholder. The original text above is
+  left as the historical record of the question this ADR deferred; reference-game
+  import (M5) is where this rejection is expected to become a real product
+  constraint, not merely a theoretical one.
 - **Multi-game upload provenance.** M1 accepts one game per request. A batch-import
   model will decide whether the original upload belongs in object storage or an
   import-level table rather than duplicating it in `games.source_pgn`.

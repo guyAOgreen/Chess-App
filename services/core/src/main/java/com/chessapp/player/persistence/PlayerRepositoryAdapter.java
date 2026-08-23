@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 class PlayerRepositoryAdapter implements PlayerRepository {
 
-    private static final String FIDE_ID_INDEX = "players_fide_id_key";
+    private static final String FIDE_ID_INDEX = "players_fide_id_idx";
 
     private final PlayerJpaRepository jpa;
 
@@ -24,7 +24,10 @@ class PlayerRepositoryAdapter implements PlayerRepository {
     @Override
     @Transactional(readOnly = true)
     public Optional<Player> findByDisplayName(String displayName) {
-        return jpa.findByDisplayName(displayName).map(PlayerRepositoryAdapter::toDomain);
+        if (displayName == null) {
+            return Optional.empty();
+        }
+        return jpa.findByDisplayName(displayName.trim()).map(PlayerRepositoryAdapter::toDomain);
     }
 
     /**
@@ -39,6 +42,17 @@ class PlayerRepositoryAdapter implements PlayerRepository {
      * detail, so it is pinned explicitly here rather than left to inherit
      * PostgreSQL's default (which happens to also be READ COMMITTED, but nothing
      * would stop that default from changing under this code).
+     *
+     * <p>The {@code isolation} attribute above only takes effect when this method
+     * starts the transaction. Under Spring's default {@code REQUIRED} propagation,
+     * a caller that opens its own transaction first and then calls this method
+     * makes it join that transaction instead — and a joined transaction keeps the
+     * isolation level it was opened with, silently ignoring the one declared here.
+     * {@link PlayerPersistenceConfiguration} closes that gap: it configures the
+     * transaction manager to validate existing transactions, so a caller that
+     * joins with a different isolation level now fails fast with an
+     * {@code IllegalTransactionStateException} instead of quietly running under
+     * the wrong guarantee.
      *
      * <p><b>Caution for callers already inside a transaction:</b> see
      * {@link PlayerJpaRepository#insertIfAbsent} — this method clears the

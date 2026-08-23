@@ -155,7 +155,6 @@ CREATE TABLE players (
     fide_id      TEXT        NULL,
     federation   TEXT        NULL,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT players_display_name_trimmed     CHECK (display_name = btrim(display_name)),
     CONSTRAINT players_display_name_not_blank   CHECK (btrim(display_name) <> ''),
     CONSTRAINT players_display_name_not_unknown CHECK (display_name <> '?'),
@@ -163,8 +162,8 @@ CREATE TABLE players (
     CONSTRAINT players_federation_format        CHECK (federation IS NULL OR federation ~ '^[A-Z]{3}$')
 );
 
-CREATE UNIQUE INDEX players_display_name_key ON players (display_name);
-CREATE UNIQUE INDEX players_fide_id_key      ON players (fide_id) WHERE fide_id IS NOT NULL;
+CREATE UNIQUE INDEX players_display_name_idx ON players (display_name);
+CREATE UNIQUE INDEX players_fide_id_idx      ON players (fide_id) WHERE fide_id IS NOT NULL;
 ```
 
 Notes:
@@ -232,7 +231,8 @@ under failsafe with Testcontainers, as `ApplicationContextIT` does.
 | Test | Kind | Covers |
 | --- | --- | --- |
 | `PlayerTest` | unit | `NewPlayer` validates before persistence; `Player` validates rehydrated data; `?`, blank, whitespace trimming, federation and FIDE ID formats |
-| `PlayerRepositoryIT` | integration | round-trip; database-generated id is populated; display-name upsert returns one identity; duplicate FIDE ID is distinguished; every CHECK constraint, including stored trimming, rejects bad input |
+| `PlayerRepositoryIT` | integration | round-trip; database-generated id is populated; display-name upsert returns one identity; duplicate FIDE ID is distinguished; `findByDisplayName` matches on the trimmed argument |
+| `PlayerSchemaIT` | integration | every CHECK constraint, including stored trimming, rejects bad input directly against the schema, independent of the JPA/adapter layer |
 | `FindOrCreatePlayerIT` | integration | creates on first call, matches on the second, two genuinely concurrent calls return the same player, and a FIDE-ID collision throws `PlayerIdentityConflict` |
 
 Test-driven, per CLAUDE.md: each behaviour gets a failing test first.
@@ -249,8 +249,16 @@ inserts, and it must assert that both calls return the *same* player id — not
 merely that neither threw. Without separate connections there is no race to test,
 because a single connection serialises the statements.
 
-This test is what pins the `READ COMMITTED` assumption above: if the isolation
-level of this path ever changes, this is the test that fails.
+This test exercises the `READ COMMITTED` assumption above, but it cannot pin it by
+itself: it calls `createOrFind` with no outer transaction open, so `createOrFind`
+always starts its own transaction and the isolation attribute always applies. A
+regression that only breaks when a caller joins an existing transaction at a
+different isolation level — the case PGN import (#7) introduces — would not be
+visible to this test at all. That gap is closed structurally rather than by a test:
+`PlayerPersistenceConfiguration` configures the transaction manager to validate
+existing transactions, so a caller joining `createOrFind` with a mismatched
+isolation level now fails fast with `IllegalTransactionStateException` instead of
+silently running under the wrong guarantee.
 
 ## Risks
 

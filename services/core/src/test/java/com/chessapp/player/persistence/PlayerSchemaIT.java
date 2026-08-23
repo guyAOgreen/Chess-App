@@ -70,7 +70,7 @@ class PlayerSchemaIT {
         insert("Green, Guy", null, "ENG");
 
         assertThatThrownBy(() -> insert("Green, Guy", null, "RSA"))
-                .hasMessageContaining("players_display_name_key");
+                .hasMessageContaining("players_display_name_idx");
     }
 
     @Test
@@ -78,7 +78,7 @@ class PlayerSchemaIT {
         insert("Smith, John", "2000123", null);
 
         assertThatThrownBy(() -> insert("Smith, J.", "2000123", null))
-                .hasMessageContaining("players_fide_id_key");
+                .hasMessageContaining("players_fide_id_idx");
     }
 
     @Test

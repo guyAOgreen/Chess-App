@@ -69,6 +69,14 @@ class PlayerRepositoryIT {
     }
 
     @Test
+    void findByDisplayNameTrimsTheArgument() {
+        Player created = players.createOrFind(new NewPlayer("Nakamura, Hikaru", null, "USA"));
+
+        assertThat(players.findByDisplayName("  Nakamura, Hikaru  "))
+                .contains(created);
+    }
+
+    @Test
     void matchingIsCaseSensitive() {
         Player upper = players.createOrFind(new NewPlayer("Short, Nigel", null, "ENG"));
         Player lower = players.createOrFind(new NewPlayer("short, nigel", null, "ENG"));

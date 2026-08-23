@@ -182,6 +182,14 @@ Lichess username
 Chess.com username
 ```
 
+Identity is the exact, trimmed `displayName`, enforced by a unique constraint;
+`Green, Guy` and `green, guy` are different players, and matching two names as the
+same person is the alias problem, not this constraint. `?`, the PGN unknown-player
+marker, is rejected rather than stored — there is no shared placeholder `Player` for
+unknown opponents. The domain model (`Player`, `NewPlayer`) is kept separate from
+the JPA entity so persistence concerns cannot leak into domain validation. See
+`docs/superpowers/specs/2026-08-22-player-domain-design.md` for the reasoning.
+
 ---
 
 ## Game

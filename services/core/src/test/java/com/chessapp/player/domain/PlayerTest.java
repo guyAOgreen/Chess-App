@@ -57,6 +57,16 @@ class PlayerTest {
         }
 
         @Test
+        void treatsThePgnUnknownMarkerAsAnAbsentFideId() {
+            assertThat(new NewPlayer("Club Opponent", "?", null).fideId()).isNull();
+        }
+
+        @Test
+        void treatsThePgnUnknownMarkerAsAnAbsentFederation() {
+            assertThat(new NewPlayer("Club Opponent", null, "?").federation()).isNull();
+        }
+
+        @Test
         void acceptsANumericFideId() {
             assertThat(new NewPlayer("Carlsen, Magnus", "1503014", null).fideId())
                     .isEqualTo("1503014");
