@@ -84,4 +84,18 @@ class PlayerRepositoryIT {
                 .isInstanceOf(PlayerIdentityConflict.class)
                 .hasMessageContaining("2000123");
     }
+
+    @Test
+    void anExistingDisplayNameReturnsTheStoredRowEvenWhenTheCandidateFideIdBelongsToAnotherPlayer() {
+        Player first = players.createOrFind(new NewPlayer("Anand, Viswanathan", "5000017", "IND"));
+        players.createOrFind(new NewPlayer("Carlsen, Magnus", "1503014", "NOR"));
+
+        Player found = players.createOrFind(
+                new NewPlayer("Anand, Viswanathan", "1503014", "NOR"));
+
+        assertThat(found.id()).isEqualTo(first.id());
+        assertThat(found.displayName()).isEqualTo(first.displayName());
+        assertThat(found.fideId()).isEqualTo(first.fideId());
+        assertThat(found.federation()).isEqualTo(first.federation());
+    }
 }

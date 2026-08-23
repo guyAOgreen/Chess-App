@@ -19,6 +19,17 @@ interface PlayerJpaRepository extends JpaRepository<PlayerEntity, java.util.UUID
      * covered by the conflict target: that is contradictory data, not a race, and
      * must surface.
      *
+     * <p><b>{@code clearAutomatically = true} detaches everything in the current
+     * persistence context, not just this entity.</b> That is required here: the
+     * subsequent read in {@link PlayerRepositoryAdapter#createOrFind} must hit the
+     * database rather than a stale first-level-cache miss for a row this same
+     * transaction just inserted. But because {@code createOrFind} normally joins
+     * an existing transaction (default {@code REQUIRED} propagation) rather than
+     * starting its own, calling it mid-transaction detaches every entity the
+     * caller had already loaded there too. A caller holding other entities across
+     * a call to {@code createOrFind} must re-read anything it intends to mutate
+     * afterwards.
+     *
      * @return 1 when this call inserted the row, 0 when it already existed
      */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
