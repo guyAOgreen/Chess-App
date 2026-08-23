@@ -15,7 +15,8 @@ See [CONTEXT.md](CONTEXT.md) for product direction and architecture,
 
 ## Prerequisites
 
-- JDK 25
+- JDK 25 — `JAVA_HOME` must point at it. The pom targets release 25, so an
+  older JDK fails with `error: release version 25 not supported`.
 - Maven 3.9+
 - Node 22+ and Yarn 1.x
 - Docker
