@@ -127,9 +127,9 @@ games
   created_at        TIMESTAMPTZ NOT NULL
   updated_at        TIMESTAMPTZ NOT NULL
 
-INDEX (white_player_id, played_on DESC)
-INDEX (black_player_id, played_on DESC)
-INDEX (played_on DESC)
+INDEX (white_player_id, played_on DESC NULLS LAST)
+INDEX (black_player_id, played_on DESC NULLS LAST)
+INDEX (played_on DESC NULLS LAST)
 ```
 
 Notes on the choices:
@@ -154,6 +154,12 @@ Notes on the choices:
   but an unrelated rename or player merge does not change historical exports.
 - **The paired indexes serve #21 directly** — games for a player as a given colour,
   most recent first.
+- **`NULLS LAST` is explicit on every `played_on` index.** PostgreSQL sorts NULLs
+  first under a descending sort, and `played_on` is `NULL` whenever a PGN date was
+  only partly known, so the default would place every undated game ahead of the
+  most recent dated one. Fixing it in the index also fixes it for the queries: an
+  `ORDER BY` that disagrees with the index cannot be served by it and falls back to
+  a sort, so #8 and #21 must order by `played_on DESC NULLS LAST`.
 - **`event` is deliberately unindexed**, although #8 filters on it. A personal game
   database is small enough that a scan costs nothing, and an index chosen before we
   know whether the filter is exact-match or prefix-search would likely be the wrong

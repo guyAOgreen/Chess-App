@@ -188,6 +188,26 @@ class NewGameTest {
         }
 
         @Test
+        void rejectsAResultTokenSeparatedByALineBreakBecausePgnWrapsLongGames() {
+            assertThatThrownBy(() -> withMovetext("1. e4 e5 2. Nf3 Nc6\n1-0"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("result token");
+        }
+
+        @Test
+        void rejectsAResultTokenSeparatedByATab() {
+            assertThatThrownBy(() -> withMovetext("1. e4 e5\t1/2-1/2"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("result token");
+        }
+
+        @Test
+        void acceptsALineBreakBetweenMovesBecausePgnWrapsLongGames() {
+            assertThat(withMovetext("1. e4 e5\n2. Nf3 Nc6").movetext())
+                    .isEqualTo("1. e4 e5\n2. Nf3 Nc6");
+        }
+
+        @Test
         void acceptsAMoveThatMerelyContainsADashOrStar() {
             assertThat(withMovetext("1. e4 e5 2. O-O-O Qxf7*").movetext())
                     .isEqualTo("1. e4 e5 2. O-O-O Qxf7*");

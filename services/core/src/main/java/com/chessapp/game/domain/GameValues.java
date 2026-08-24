@@ -2,6 +2,7 @@ package com.chessapp.game.domain;
 
 import java.util.Arrays;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Validation and normalisation shared by {@link NewGame} and {@link Game}, so a
@@ -14,6 +15,19 @@ final class GameValues {
     private static final String PGN_UNKNOWN = "?";
 
     private static final Pattern ECO = Pattern.compile("[A-E][0-9]{2}");
+
+    /**
+     * A result token at the very end, preceded by start-of-input or any
+     * whitespace. Derived from {@link GameResult} so the tokens cannot drift,
+     * and deliberately the same rule as the {@code games_movetext_no_result_token}
+     * constraint in the migration: PGN wraps long games across lines, so a token
+     * can follow a newline or a tab just as easily as a space.
+     */
+    private static final Pattern TRAILING_RESULT_TOKEN = Pattern.compile(
+            Arrays.stream(GameResult.values())
+                    .map(GameResult::pgnToken)
+                    .map(Pattern::quote)
+                    .collect(Collectors.joining("|", "(^|\\s)(", ")$")));
 
     private GameValues() {
     }
@@ -106,10 +120,7 @@ final class GameValues {
             throw new IllegalArgumentException(
                     "movetext must not contain tag pairs; tags are held in their own columns");
         }
-        String lastToken = trimmed.substring(trimmed.lastIndexOf(' ') + 1);
-        boolean endsWithResult = Arrays.stream(GameResult.values())
-                .anyMatch(result -> result.pgnToken().equals(lastToken));
-        if (endsWithResult) {
+        if (TRAILING_RESULT_TOKEN.matcher(trimmed).find()) {
             throw new IllegalArgumentException(
                     "movetext must not end in a result token; the result column is authoritative,"
                             + " and assembly appends the token from it");

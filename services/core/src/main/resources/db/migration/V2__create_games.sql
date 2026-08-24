@@ -76,9 +76,17 @@ CREATE TABLE games (
 
 -- Games for a player as a given colour, most recent first: the shape opponent
 -- preparation and the games-by-player views ask for.
-CREATE INDEX games_white_player_played_on_idx ON games (white_player_id, played_on DESC);
-CREATE INDEX games_black_player_played_on_idx ON games (black_player_id, played_on DESC);
-CREATE INDEX games_played_on_idx ON games (played_on DESC);
+--
+-- NULLS LAST is explicit because PostgreSQL sorts NULLs first under a descending
+-- sort. played_on is NULL whenever a PGN date was only partly known, so the
+-- default would put every undated game ahead of the most recent dated one. It
+-- also fixes the ordering the queries must use: an ORDER BY that disagrees with
+-- the index cannot be served by it, and would fall back to a sort.
+CREATE INDEX games_white_player_played_on_idx
+    ON games (white_player_id, played_on DESC NULLS LAST);
+CREATE INDEX games_black_player_played_on_idx
+    ON games (black_player_id, played_on DESC NULLS LAST);
+CREATE INDEX games_played_on_idx ON games (played_on DESC NULLS LAST);
 
 -- event is deliberately unindexed. A personal game database is small enough that
 -- a scan costs nothing, and the right index depends on whether the filter turns

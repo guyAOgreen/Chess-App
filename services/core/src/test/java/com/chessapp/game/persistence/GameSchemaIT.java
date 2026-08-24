@@ -186,8 +186,44 @@ class GameSchemaIT {
     }
 
     @Test
+    void rejectsAResultTokenSeparatedByALineBreakJustAsTheDomainDoes() {
+        assertThatThrownBy(() -> insertWith("movetext", "1. e4 e5 2. Nf3 Nc6\n1-0"))
+                .hasMessageContaining("games_movetext_no_result_token");
+    }
+
+    @Test
+    void acceptsALineBreakBetweenMovesBecausePgnWrapsLongGames() throws SQLException {
+        assertThat(insertWith("movetext", "1. e4 e5\n2. Nf3 Nc6")).isNotNull();
+    }
+
+    @Test
     void acceptsMovetextWhoseLastMoveMerelyContainsADash() throws SQLException {
         assertThat(insertWith("movetext", "1. e4 e5 2. Nf3 Nc6 3. O-O-O")).isNotNull();
+    }
+
+    /**
+     * PostgreSQL sorts NULLs first under a descending sort, which would place every
+     * undated game ahead of the most recent dated one. The indexes pin NULLS LAST so
+     * the most-recent-first queries can be served by them directly rather than
+     * falling back to a sort.
+     */
+    @Test
+    void ordersUndatedGamesLastInEveryRecencyIndex() throws SQLException {
+        try (var connection = dataSource.getConnection();
+             var statement = connection.prepareStatement(
+                     "SELECT indexname, indexdef FROM pg_indexes"
+                             + " WHERE tablename = 'games' AND indexdef LIKE '%played_on%'")) {
+            try (var rows = statement.executeQuery()) {
+                int indexes = 0;
+                while (rows.next()) {
+                    indexes++;
+                    assertThat(rows.getString("indexdef"))
+                            .as("index %s", rows.getString("indexname"))
+                            .contains("played_on DESC NULLS LAST");
+                }
+                assertThat(indexes).isEqualTo(3);
+            }
+        }
     }
 
     @Test
