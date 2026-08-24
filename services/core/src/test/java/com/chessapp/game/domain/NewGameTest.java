@@ -114,6 +114,19 @@ class NewGameTest {
         }
 
         @Test
+        void rejectsATagContainingAUnicodeLineOrParagraphSeparator() {
+            // Neither separator is an ISO control, but Java's \R treats both as
+            // line terminators, as do many PGN readers, so a tag carrying one
+            // would be emitted as a value spread over two lines.
+            assertThatThrownBy(() -> withEvent("Club" + Character.toString(0x2028) + "Champs"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("control character");
+            assertThatThrownBy(() -> withEvent("Club" + Character.toString(0x2029) + "Champs"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("control character");
+        }
+
+        @Test
         void rejectsATagContainingALineBreak() {
             assertThatThrownBy(() -> withEvent("Club\nChampionship"))
                     .isInstanceOf(IllegalArgumentException.class)

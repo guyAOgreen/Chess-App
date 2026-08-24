@@ -87,8 +87,27 @@ final class GameValues {
         return trimmed;
     }
 
+    /**
+     * U+2028 LINE SEPARATOR and U+2029 PARAGRAPH SEPARATOR, written numerically
+     * because both characters are invisible in source.
+     */
+    private static final int LINE_SEPARATOR = 0x2028;
+    private static final int PARAGRAPH_SEPARATOR = 0x2029;
+
+    /**
+     * A character that cannot appear in a value we emit as a PGN tag.
+     *
+     * <p>{@link Character#isISOControl} is not the whole rule. Neither separator
+     * is an ISO control, but Java's {@code \R} treats both as line terminators —
+     * so {@code PgnTagReader}, which splits a document on {@code \R}, and the many
+     * PGN readers that do the same would see a tag value spread over two lines and
+     * fail to read the document back. The PGN specification defines a string token
+     * as printing characters between quotation marks, so a value carrying one is
+     * not a legal tag value whatever the escaping.
+     */
     private static boolean hasControlCharacter(String value) {
-        return value.chars().anyMatch(Character::isISOControl);
+        return value.codePoints().anyMatch(character -> Character.isISOControl(character)
+                || character == LINE_SEPARATOR || character == PARAGRAPH_SEPARATOR);
     }
 
     static String eco(String raw) {
