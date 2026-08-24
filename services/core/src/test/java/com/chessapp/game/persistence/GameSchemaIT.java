@@ -237,4 +237,16 @@ class GameSchemaIT {
         assertThatThrownBy(() -> insertWith("site", "?"))
                 .hasMessageContaining("games_site");
     }
+
+    @Test
+    void rejectsAGameTimeNameContainingALineBreak() {
+        assertThatThrownBy(() -> insertWith("white_name", "Green,\nGuy"))
+                .hasMessageContaining("games_white_name_no_control");
+    }
+
+    @Test
+    void rejectsAnOptionalTagContainingALineBreak() {
+        assertThatThrownBy(() -> insertWith("event", "Club\nChampionship"))
+                .hasMessageContaining("games_event_no_control");
+    }
 }

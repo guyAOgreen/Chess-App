@@ -112,6 +112,13 @@ class NewGameTest {
             assertThat(bare.eco()).isNull();
             assertThat(bare.sourcePgn()).isNull();
         }
+
+        @Test
+        void rejectsATagContainingALineBreak() {
+            assertThatThrownBy(() -> withEvent("Club\nChampionship"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("control character");
+        }
     }
 
     @Nested

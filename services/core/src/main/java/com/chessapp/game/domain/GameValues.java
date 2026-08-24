@@ -49,6 +49,10 @@ final class GameValues {
             throw new IllegalArgumentException(
                     "name must not be \"?\", the PGN unknown player marker");
         }
+        if (hasControlCharacter(trimmed)) {
+            throw new IllegalArgumentException(
+                    "name must not contain a control character; it becomes a PGN tag value");
+        }
         return trimmed;
     }
 
@@ -76,7 +80,15 @@ final class GameValues {
         if (trimmed.isEmpty() || PGN_UNKNOWN.equals(trimmed)) {
             return null;
         }
+        if (hasControlCharacter(trimmed)) {
+            throw new IllegalArgumentException(
+                    "tag value must not contain a control character; it becomes a PGN tag value");
+        }
         return trimmed;
+    }
+
+    private static boolean hasControlCharacter(String value) {
+        return value.chars().anyMatch(Character::isISOControl);
     }
 
     static String eco(String raw) {

@@ -54,4 +54,18 @@ class GameSideTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("rating");
     }
+
+    @Test
+    void rejectsANameContainingALineBreakBecauseItWouldBreakPgnAssembly() {
+        assertThatThrownBy(() -> new GameSide(PLAYER_ID, "Green,\nGuy", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("control character");
+    }
+
+    @Test
+    void rejectsANameContainingATab() {
+        assertThatThrownBy(() -> new GameSide(PLAYER_ID, "Green,\tGuy", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("control character");
+    }
 }
