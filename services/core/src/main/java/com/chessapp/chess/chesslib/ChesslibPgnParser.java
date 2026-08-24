@@ -41,9 +41,18 @@ public class ChesslibPgnParser implements PgnParser {
             return rejected(PgnErrorCode.NOT_PGN, "no PGN text was supplied");
         }
 
+        // Computed from the ORIGINAL pgn argument and never reassigned: everything
+        // downstream that decides the declared result (the NO_MOVES check, the
+        // UNREADABLE_MOVE guard, and result resolution at the bottom of this
+        // method) must keep reading what the document actually said, not the
+        // token readGames may append below purely to make chesslib parse the
+        // moves. Do not let a normalised copy leak into these variables.
+        String movetext = PgnTagReader.movetext(pgn);
+        String terminalToken = terminalToken(movetext);
+
         List<Game> games;
         try {
-            games = readGames(pgn);
+            games = readGames(pgn, terminalToken != null);
         } catch (RuntimeException unreadable) {
             return rejected(PgnErrorCode.NOT_PGN,
                     "the text could not be read as PGN: " + unreadable.getMessage());
@@ -74,8 +83,6 @@ public class ChesslibPgnParser implements PgnParser {
                             + " supported yet");
         }
 
-        String movetext = PgnTagReader.movetext(pgn);
-        String terminalToken = terminalToken(movetext);
         if (withoutTerminalToken(movetext, terminalToken).isBlank()) {
             return rejected(PgnErrorCode.NO_MOVES, "the game has no moves");
         }
@@ -85,6 +92,18 @@ public class ChesslibPgnParser implements PgnParser {
             // Game.loadMoveText() declares "throws Exception" in chesslib 1.3.7,
             // so the catch below is Exception rather than RuntimeException.
             game.loadMoveText();
+            // chesslib only parses movetext during iteration when the source line
+            // ends with a result token; readGames guarantees that now, so a
+            // no-terminal-token document can no longer silently reach here with
+            // zero half-moves. But comment-only, NAG-only or bare-move-number
+            // movetext ("{no moves here} *", "$1 *", "1. *") passes the earlier
+            // non-blank text check yet still parses to zero half-moves without
+            // throwing (verified empirically) — this guard is what catches that,
+            // rather than reporting a game with no real moves as a success.
+            if (game.getHalfMoves().isEmpty()) {
+                return rejected(PgnErrorCode.UNREADABLE_MOVE,
+                        "the moves could not be read from the movetext");
+            }
             moves = ValidatedMoves.of(game.getHalfMoves());
         } catch (IllegalMoveAtPly illegal) {
             return rejected(PgnErrorCode.ILLEGAL_MOVE, illegal.getMessage(), illegal.ply());
@@ -133,10 +152,22 @@ public class ChesslibPgnParser implements PgnParser {
     /**
      * The iterator validates lazily and throws from iteration itself, so the whole
      * loop is inside the caller's error handling rather than only the move loading.
+     *
+     * <p>chesslib only parses a game's movetext during iteration when the source
+     * text ends with one of the four PGN result tokens; without one,
+     * {@code Game.getMoveText()} stays null and the later {@code loadMoveText()}
+     * call is a documented no-op that neither parses anything nor throws (verified
+     * empirically: a document with real, legal moves but no trailing token yields
+     * zero half-moves and no error). So when the caller reports the document has
+     * no terminal token of its own, a {@code *} is appended to a LOCAL COPY of the
+     * text before handing it to chesslib, purely to make the library's parse gate
+     * fire. The caller's own reading of the document — what result it actually
+     * declared — must never be derived from this copy.
      */
-    private static List<Game> readGames(String pgn) {
+    private static List<Game> readGames(String pgn, boolean hasTerminalToken) {
+        String forChesslib = hasTerminalToken ? pgn : pgn.stripTrailing() + " *";
         List<Game> games = new ArrayList<>();
-        try (PgnIterator iterator = new PgnIterator(List.of(pgn.split("\\R", -1)))) {
+        try (PgnIterator iterator = new PgnIterator(List.of(forChesslib.split("\\R", -1)))) {
             for (Game game : iterator) {
                 games.add(game);
             }

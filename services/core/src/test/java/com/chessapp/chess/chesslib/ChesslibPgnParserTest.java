@@ -71,6 +71,19 @@ class ChesslibPgnParserTest {
         }
 
         @Test
+        void readsAGameWhoseMovetextHasNoTerminalTokenRatherThanSilentlyDroppingItsMoves() {
+            String noToken = """
+                    [White "A"]
+                    [Black "B"]
+                    [Result "1-0"]
+
+                    1. e4 e5 2. Nf3 Nc6
+                    """;
+
+            assertThat(parsed(noToken).movetext()).isEqualTo("1. e4 e5 2. Nf3 Nc6");
+        }
+
+        @Test
         void dropsCommentsNagsAndVariations() {
             String annotated = """
                     [White "A"]
@@ -242,6 +255,18 @@ class ChesslibPgnParserTest {
                     """;
 
             assertThat(rejectedCode(none)).isEqualTo(PgnErrorCode.RESULT_MISSING);
+        }
+
+        @Test
+        void stillReportsAMissingResultWhenNeitherATagNorATerminalTokenIsPresent() {
+            String neither = """
+                    [White "A"]
+                    [Black "B"]
+
+                    1. e4 e5
+                    """;
+
+            assertThat(rejectedCode(neither)).isEqualTo(PgnErrorCode.RESULT_MISSING);
         }
 
         @Test
