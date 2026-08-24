@@ -150,12 +150,30 @@ two sources of tag truth in one parser, and the next lossy mapping adds a third
 special case. Owning the tag section makes metadata fidelity our responsibility
 rather than a property of the library we happened to choose.
 
+### 11. The moves are counted before they are trusted
+
+chesslib reporting success does not mean chesslib read the game. It can stop part
+way through a movetext silently, so the parser counts the move tokens in the
+movetext **it** extracted — `PgnMoveCounter`, stripping comments, recursive
+variations, NAGs, move number indicators and the terminal result token by the
+specification's rules — and rejects the document when that count disagrees with
+`getHalfMoves().size()`.
+
+Ending a `;` comment at the end of its LINE is exactly where the specification and
+chesslib disagree, and is therefore the point of writing our own counter rather
+than reusing the library's idea of a comment.
+
+The document is rejected rather than repaired. Feeding chesslib corrected text —
+the `;` line rewritten, the undecodable token dropped — would make the parser a
+repairer of documents, which ADR 0002 and the goal of this design both rule out.
+The user is told how many moves their file submits and how many could be read.
+
 ### What chesslib is and is not used for
 
 | Used for | Not used for |
 | --- | --- |
 | Decoding SAN into moves, including stripping comments, NAGs and variations | Any tag value |
-| Emitting normalised SAN via `toSanWithMoveNumbers()` | Deciding whether a move is legal |
+| Emitting normalised SAN via `toSanWithMoveNumbers()` | Deciding whether a move is legal, or whether all the moves were read |
 | Counting games in a document | Deciding the result |
 | Detecting checkmate and stalemate in the final position | Producing canonical PGN |
 
@@ -168,8 +186,9 @@ com.chessapp.chess
 ├── ParsedGame.java
 ├── PgnError.java
 ├── PgnErrorCode.java
-├── PgnTagReader.java         package-private: [Name "value"] section -> Map
-├── PgnTagValues.java         package-private: date, rating and optional-tag rules
+├── PgnTagReader.java         [Name "value"] section -> Map, and the movetext
+├── PgnTagValues.java         date, rating and optional-tag rules
+├── PgnMoveCounter.java       movetext -> the number of moves it submits
 └── chesslib/
     ├── ChesslibPgnParser.java   implements PgnParser, orchestrates
     └── ValidatedMoves.java      package-private: SAN -> movetext + final position
@@ -178,8 +197,8 @@ com.chessapp.game.domain
 └── CanonicalPgn.java
 ```
 
-`PgnTagReader` and `PgnTagValues` sit outside the `chesslib` package because they
-touch no library code. Only the two files in `chesslib/` import
+`PgnTagReader`, `PgnTagValues` and `PgnMoveCounter` sit outside the `chesslib`
+package because they touch no library code. Only the two files in `chesslib/` import
 `com.github.bhlangonijr.*`, which is what ADR 0001 requires.
 
 The `chess` module has no `api`, `application` or `persistence` package. It serves
@@ -221,6 +240,11 @@ the application; no chesslib object or mutable collection crosses the boundary.
 `parse(null)`, blank input and text containing no readable game return
 `Rejected(NOT_PGN, ...)` rather than throwing.
 
+A leading UTF-8 byte order mark is stripped once, before anything reads the
+document. `\s` does not match `U+FEFF`, so the mark would otherwise break the tag
+pattern on the first line alone — silently discarding that one tag into the
+movetext — and ChessBase and Windows exports routinely carry it.
+
 The wrapper catches `RuntimeException` and translates it. It does not catch `Error`.
 That is the whole rule: a defect in our own code and a defect in chesslib arrive
 through the same frames with the same types, so there is no runtime test that
@@ -246,13 +270,27 @@ assumes the obvious thing:
   Trim it.
 * **`SetUp` lands in `getProperty()` while `FEN` lands in `getFen()`.** Decision 8
   checks both, and the tag reader sees them anyway.
+* **The library can read PART of a movetext and report success.** Two shapes were
+  found in review, both silent:
+
+  ```text
+  "1. e4 e5 2. Nf3 ; developing\n2... Nc6 3. Bb5 a6 1-0"   ->  3 half-moves
+  "1. e4 e5 2. Z0 1-0"           (ChessBase null move)     ->  2 half-moves
+  ```
+
+  chesslib ends a `;` comment at the end of the whole movetext rather than the end
+  of the line, and keeps what it had when it meets a token it cannot decode. A
+  guard against zero half-moves does not catch either, so a real game would be
+  stored with its later moves missing. Decision 11 is the answer.
 
 `ply` is a 1-based half-move index — ply 1 is White's first move — and is null for
 errors that are not about a specific move. `ILLEGAL_MOVE` always carries one,
 because our own replay loop knows exactly where it stopped. `UNREADABLE_MOVE`
-carries one only when the library says where it failed, which it often does not;
-the message always carries the offending text. `message` is written for a person
-looking at their own file, and names the move number and SAN where it has them.
+carries one when the move count check knows where the library stopped reading —
+the ply after the last move it read — and null when the movetext yielded no moves
+at all. The library never tells us which SAN it choked on, so no error message
+quotes the offending text; the count mismatch message names both counts instead,
+which is what points a person at the right part of their own file.
 
 `movetext` satisfies the rules `Game.movetext` enforces: SAN with move numbers, no
 tag pairs, no terminal result token. It comes from
@@ -267,11 +305,11 @@ ones — are not returned. ADR 0002 keeps them recoverable from `source_pgn`, wh
 
 | Code | Rejected when | `ply` |
 | --- | --- | --- |
-| `NOT_PGN` | No game can be read from the text | null |
+| `NOT_PGN` | No game can be read from the text, including SAN the library throws on | null |
 | `MULTIPLE_GAMES` | The document holds more than one game | null |
 | `NON_STANDARD_START_POSITION` | `SetUp` or `FEN` is present | null |
 | `NO_MOVES` | The game has no moves | null |
-| `UNREADABLE_MOVE` | SAN at this ply cannot be understood | best effort |
+| `UNREADABLE_MOVE` | The movetext yields no moves, or fewer moves than it submits | set on a count mismatch |
 | `ILLEGAL_MOVE` | SAN at this ply is not legal in the reconstructed position | set |
 | `PLAYER_UNKNOWN` | `White` or `Black` is absent, blank or `?` | null |
 | `RESULT_MISSING` | Neither a `Result` tag nor a terminal token is present | null |
@@ -285,6 +323,22 @@ document always produces the same error: document structure (`NOT_PGN`,
 Moves come before player and result tags because a file
 whose moves do not reconstruct is broken in a way the user must fix first, and
 because the result checks need the reconstructed final position.
+
+Two of these rows read differently from how they were first planned, because the
+library decides where a failure surfaces and does not ask us:
+
+* **Malformed SAN is `NOT_PGN`, not `UNREADABLE_MOVE`.** `2. Zz9` makes chesslib's
+  `PgnIterator` throw `PgnException` while iterating, before move loading runs and
+  before we hold a game at all, so it is caught as a document that could not be
+  read. That exception's message is usually empty, so no error message can name the
+  offending SAN. Changing this would mean pre-validating every SAN token ourselves —
+  a second SAN decoder competing with the one that decides the moves — which is a
+  worse trade than a blunt code.
+* **`UNREADABLE_MOVE` is about movetext that yields no moves, or not all of them.**
+  It is produced by movetext carrying only comments, NAGs or bare move numbers
+  (`{no moves here} *`), where chesslib returns zero half-moves without throwing,
+  and by Decision 11's count mismatch, where it carries the ply after the last move
+  the library read.
 
 ### Resolving the result
 
@@ -383,7 +437,12 @@ is added here rather than left for the first malformed export to find.
 `Event`, `Site`, `Round` and `ECO`. `GameTest`, `NewGameTest` and `GameSideTest`
 gain cases for it, on both newly created and rehydrated values.
 
-**A Flyway migration `V3` adds the matching `CHECK` constraints**, because #5
+The rule covers U+2028 LINE SEPARATOR and U+2029 PARAGRAPH SEPARATOR as well as the
+ISO controls. Neither is an ISO control, but Java's `\R` treats both as line
+terminators, as do many PGN readers, so a value carrying one assembles into a
+document spread over two lines that cannot be read back.
+
+**Flyway migrations `V3` and `V4` add the matching `CHECK` constraints**, because #5
 established that every domain rule is mirrored in the database, and a domain rule
 without one leaves the two disagreeing — the divergence found in review on #35, and
 the reason `movetext` validation had to be rewritten. `GameSchemaIT` gains a case
@@ -394,16 +453,26 @@ argument `btrim` strips spaces only, while Java's `trim()` strips every characte
 to and including the space, so the two are not equivalent for tabs and newlines. The
 rule needs an explicit pattern, `!~ '[[:cntrl:]]'`.
 
+`[[:cntrl:]]` matches neither separator — verified by running the predicate on
+PostgreSQL 18 rather than assuming it — so `V4` adds a second constraint per
+column, `!~ E'[\u2028\u2029]'`. `V3` is left untouched, as an applied migration
+always is, and the separate names tell a reader which rule a row broke.
+
 ## Testing
 
 Parsing and assembly are unit tests throughout: neither touches HTTP or the
 database, so no Spring context and no Testcontainers. The one exception is
-`GameSchemaIT`, which already exists and gains cases for the `V3` constraints.
+`GameSchemaIT`, which already exists and gains cases for the `V3` and `V4`
+constraints.
 
 **`PgnTagReaderTest`** — the tag pair section reads into a map; escaped `\"` and
 `\\` inside values; values containing brackets; a missing section; tags spread over
 irregular whitespace; the raw `Round` value `3.2` surviving intact, which is the
-whole reason this class exists.
+whole reason this class exists; and a 100,000-character tag value, which pins the
+possessive form of the value group. The natural spelling of a PGN string token
+recurses once per character in `java.util.regex` and threw `StackOverflowError`
+under two thousand characters — an `Error`, so it escaped `parse()` and its
+never-throws contract entirely.
 
 **`PgnTagValuesTest`** — date, rating and optional-tag normalisation, including
 `????.??.??`, a partial date, the impossible `2026.02.30`, `?` and blank values, and
@@ -412,7 +481,15 @@ a non-numeric rating.
 **`ChesslibPgnParserTest`** — a real PGN parses to the expected tags, movetext and
 result; movetext normalisation, including `O-O`, `=Q` promotion and check suffixes;
 one case per row of the validation table; null and blank input; an annotated game
-parsing with its comments, NAGs and variations dropped from `movetext`.
+parsing with its comments, NAGs and variations dropped from `movetext`; a
+byte-order-marked document parsing identically to the same document without one;
+and the two truncation shapes of Decision 11 — a `;` comment and an undecodable
+token — rejected rather than stored short.
+
+**`PgnMoveCounterTest`** — plain, annotated, wrapped and comment-only movetext; a
+`;` comment ending at its line break; nested variations; a comment inside a
+variation that contains `)`; a move number written without a space; and an
+unterminated comment or variation.
 
 **`ChesslibContractTest`** — one test per constraint in ADR 0001, expressed through
 our API rather than the library's, so a library upgrade that regresses one fails our
