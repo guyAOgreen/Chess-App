@@ -22,6 +22,12 @@ class PgnTagValuesTest {
             assertThat(PgnTagValues.optional("   ")).isNull();
             assertThat(PgnTagValues.optional("?")).isNull();
         }
+
+        @Test
+        void treatsAValueCarryingAControlCharacterAsAbsentBecauseItCannotBeAPgnTag() {
+            assertThat(PgnTagValues.optional("Club\tChampionship")).isNull();
+            assertThat(PgnTagValues.optional("Club\nChampionship")).isNull();
+        }
     }
 
     @Nested
@@ -94,6 +100,11 @@ class PgnTagValuesTest {
             assertThat(PgnTagValues.eco("C6")).isNull();
             assertThat(PgnTagValues.eco("?")).isNull();
             assertThat(PgnTagValues.eco(null)).isNull();
+        }
+
+        @Test
+        void returnsNullForACodeCarryingAControlCharacter() {
+            assertThat(PgnTagValues.eco("C6\t0")).isNull();
         }
     }
 }

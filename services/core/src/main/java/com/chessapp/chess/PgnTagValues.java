@@ -30,13 +30,25 @@ public final class PgnTagValues {
     private PgnTagValues() {
     }
 
-    /** Absent, blank and {@code ?} all mean the same thing, so all three become null. */
+    /**
+     * Absent, blank and {@code ?} all mean the same thing, so all three become null.
+     * A value carrying a control character is unusable as a PGN tag and is treated
+     * the same as absent, since {@link String#trim()} only strips control characters
+     * from the ends.
+     */
     public static String optional(String raw) {
         if (raw == null) {
             return null;
         }
         String trimmed = raw.trim();
-        return trimmed.isEmpty() || UNKNOWN.equals(trimmed) ? null : trimmed;
+        if (trimmed.isEmpty() || UNKNOWN.equals(trimmed) || hasControlCharacter(trimmed)) {
+            return null;
+        }
+        return trimmed;
+    }
+
+    private static boolean hasControlCharacter(String value) {
+        return value.chars().anyMatch(Character::isISOControl);
     }
 
     /**
