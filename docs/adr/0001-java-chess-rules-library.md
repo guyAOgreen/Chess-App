@@ -73,6 +73,8 @@ its README. The probe has been deleted; its findings are recorded here.
   `BlackElo`, `ECO` and `Termination`; NAGs, brace comments, `[%clk]` annotations,
   nested variations and multi-game files. `PgnIterator` accepts an
   `Iterable<String>`, so a request body can be parsed without writing a temp file.
+  **Corrected 2026-08-24:** "handles" means structure, not legality. The reader
+  accepts an illegal pawn move; see constraint 1.
 - **Zobrist hashing transposes correctly** — 1.e4 e5 2.Nf3 and 1.Nf3 e5 2.e4 produce
   the same key. This is the basis for position indexing in opponent preparation.
 
@@ -87,13 +89,24 @@ These are the reasons the wrapper is not optional.
    moving three squares. Both check only that the resulting position is internally
    valid. They do correctly reject moves that leave one's own king in check.
 
-   Only two paths are authoritative: `board.legalMoves()`, and SAN parsed through
-   `MoveList`. The wrapper must expose only those, and must never accept a
-   caller-constructed move without checking it against `legalMoves()`.
+   **Corrected 2026-08-24 by a second probe.** The original text named SAN parsed
+   through `MoveList` as a second authoritative path. It is not.
+   `MoveList.loadFromSan("1. e5 e5")` is accepted and yields `1. e5 exe5` — a white
+   pawn moving three squares from e2 — and the PGN reader accepts the same input.
+   Illegal piece moves and illegal castling *are* rejected; the hole is in pawn
+   decoding specifically.
 
-2. **Failures are not always `MoveConversionException`.** SAN describing a capture
-   of the king — `Qxe1` where e1 holds the enemy king — throws an unchecked
-   `ArrayIndexOutOfBoundsException`. Recognition will produce exactly this kind of
+   Only `board.legalMoves()` is authoritative. The wrapper must replay every move
+   against it and must never accept a move from any other source without that check.
+
+2. **Failures are unchecked, and arrive from more than one place.**
+   `MoveConversionException`, `PgnException` and `MoveException` all extend
+   `RuntimeException`; the original text described the first as a declared checked
+   exception, which it is not. **Corrected 2026-08-24:** SAN describing a capture of
+   the king surfaces as `PgnException` thrown by the iterator itself, not as
+   `ArrayIndexOutOfBoundsException` during move loading, so error handling must wrap
+   the iteration. A game with no moves throws `NullPointerException` inside
+   `loadMoveText()`. Recognition will produce exactly this kind of
    nonsense. The wrapper must catch `RuntimeException`, not just the declared
    checked exception, and translate to a domain error.
 
