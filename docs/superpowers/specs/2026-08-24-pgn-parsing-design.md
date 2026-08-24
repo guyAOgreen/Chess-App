@@ -109,6 +109,56 @@ the inconsistent combinations (`SetUp` without `FEN`, `FEN` without `SetUp`, or
 positions later requires modelling the initial position on `Game`, updating the
 assembler, and adding replay and persistence tests as one coherent change.
 
+### 9. Legality is verified by replaying against `legalMoves()`
+
+A probe of chesslib 1.3.7, run while planning this work, found that **no chesslib
+path rejects an illegal pawn move**:
+
+```text
+MoveList.loadFromSan("1. e5 e5")   ACCEPTED -> "1. e5 exe5"
+replay against legalMoves()        REJECTED at ply 1, move = e2e5
+```
+
+`1. e5` is a white pawn moving three squares from e2. The PGN reader accepts it and
+so does raw `loadFromSan`. Illegal piece moves and illegal castling *are* rejected;
+the hole is in pawn decoding specifically.
+
+ADR 0001 states that "SAN parsed through `MoveList`" is one of two authoritative
+paths. That is wrong, and this design does not rely on it. Every move is replayed
+through a `Board` and checked for membership in `legalMoves()` before it is
+accepted, which is also what produces the ply for an `ILLEGAL_MOVE`.
+
+**Correcting ADR 0001 is part of this change.** A known-wrong safety claim in the
+ADR that justifies the wrapper is how someone later deletes the replay loop as
+redundant.
+
+### 10. Tag values are read from the document, not from chesslib
+
+The same probe found chesslib's parsed game model too lossy for our metadata:
+
+* **`Round` is destroyed.** `[Round "3.2"]` and `[Round "?"]` both yield
+  `getNumber() == 1`, and `Round` does not appear in `getProperty()`. ADR 0002 typed
+  the column `TEXT` precisely because `1.2` and `?` are both legal, so taking
+  chesslib's answer would defeat that decision.
+* **A missing `Result` is indistinguishable from `*`.** Both yield `ONGOING`, and
+  the terminal movetext token is not exposed at all, so `RESULT_MISSING` and
+  `RESULT_CONFLICT` cannot be implemented from the parsed model.
+
+So a small tag reader of our own parses the `[Name "value"]` section, and chesslib
+is used only for moves. Patching just the two broken tags was rejected: it leaves
+two sources of tag truth in one parser, and the next lossy mapping adds a third
+special case. Owning the tag section makes metadata fidelity our responsibility
+rather than a property of the library we happened to choose.
+
+### What chesslib is and is not used for
+
+| Used for | Not used for |
+| --- | --- |
+| Decoding SAN into moves, including stripping comments, NAGs and variations | Any tag value |
+| Emitting normalised SAN via `toSanWithMoveNumbers()` | Deciding whether a move is legal |
+| Counting games in a document | Deciding the result |
+| Detecting checkmate and stalemate in the final position | Producing canonical PGN |
+
 ## Package layout
 
 ```text
@@ -118,12 +168,19 @@ com.chessapp.chess
 ├── ParsedGame.java
 ├── PgnError.java
 ├── PgnErrorCode.java
+├── PgnTagReader.java         package-private: [Name "value"] section -> Map
+├── PgnTagValues.java         package-private: date, rating and optional-tag rules
 └── chesslib/
-    └── ChesslibPgnParser.java   the only file importing com.github.bhlangonijr.*
+    ├── ChesslibPgnParser.java   implements PgnParser, orchestrates
+    └── ValidatedMoves.java      package-private: SAN -> movetext + final position
 
 com.chessapp.game.domain
 └── CanonicalPgn.java
 ```
+
+`PgnTagReader` and `PgnTagValues` sit outside the `chesslib` package because they
+touch no library code. Only the two files in `chesslib/` import
+`com.github.bhlangonijr.*`, which is what ADR 0001 requires.
 
 The `chess` module has no `api`, `application` or `persistence` package. It serves
 no HTTP, holds no state and touches no database; it is a rules wrapper, and the
@@ -164,12 +221,31 @@ the application; no chesslib object or mutable collection crosses the boundary.
 `parse(null)`, blank input and text containing no readable game return
 `Rejected(NOT_PGN, ...)` rather than throwing.
 
-The wrapper catches `RuntimeException` and translates it, per ADR 0001's constraint
-that chesslib signals some failures with an unchecked
-`ArrayIndexOutOfBoundsException` rather than the declared checked exception. It does
-not catch `Error`. That is the whole rule: a defect in our own code and a defect in
-chesslib arrive through the same frames with the same types, so there is no runtime
-test that separates them, and no attempt should be made to write one.
+The wrapper catches `RuntimeException` and translates it. It does not catch `Error`.
+That is the whole rule: a defect in our own code and a defect in chesslib arrive
+through the same frames with the same types, so there is no runtime test that
+separates them, and no attempt should be made to write one.
+
+### Library behaviour the implementation must handle
+
+Each of these was observed in the probe, and each will bite an implementer who
+assumes the obvious thing:
+
+* **Failures arrive during iteration, not only during move loading.** SAN capturing
+  the king throws `PgnException` from the iterator itself. The `try` must wrap the
+  whole iteration, not just `loadMoveText()`.
+* **`MoveConversionException`, `PgnException` and `MoveException` all extend
+  `RuntimeException`.** ADR 0001 describes the first as checked; it is not. Nothing
+  needs declaring, and nothing may be left uncaught on that assumption.
+* **A game with no moves throws `NullPointerException` inside `loadMoveText()`**
+  ("Cannot invoke String.indexOf(int) because fen is null"). `NO_MOVES` has to be
+  detected from the raw movetext before the library is asked to load it.
+* **`getProperty()` returns null**, not an empty map, when a game has no unmodelled
+  tags.
+* **`toSanWithMoveNumbers()` emits a trailing space**, which `Game.movetext` rejects.
+  Trim it.
+* **`SetUp` lands in `getProperty()` while `FEN` lands in `getFen()`.** Decision 8
+  checks both, and the tag reader sees them anyway.
 
 `ply` is a 1-based half-move index — ply 1 is White's first move — and is null for
 errors that are not about a specific move. `message` is written for a person
@@ -274,6 +350,27 @@ assembly is ours.
 `com.github.bhlangonijr:chesslib:1.3.7`, pinned exactly — never a branch reference
 or `-SNAPSHOT`, per ADR 0001.
 
+## Changes to ADR 0001
+
+The probe run while planning this work contradicts three statements in
+[ADR 0001](../../adr/0001-java-chess-rules-library.md), which are corrected as part
+of this change:
+
+1. **Constraint 1 exempts "SAN parsed through `MoveList`" from the legality
+   warning.** It should not: `loadFromSan` accepts a three-square pawn push. Only
+   `legalMoves()` is authoritative, and the wrapper must replay against it.
+2. **Constraint 2 calls `MoveConversionException` "the declared checked
+   exception".** It is unchecked, and the king-capture case actually surfaces as
+   `PgnException` during iteration rather than `ArrayIndexOutOfBoundsException`
+   during move loading.
+3. **The "what works" section implies the PGN reader validates legality.** It
+   validates structure and rejects illegal piece moves and castling, but not pawn
+   moves.
+
+The evaluation findings stay as written where they were right; the corrections are
+added with a note that they came from a second probe, so the ADR remains a record of
+what was checked and when.
+
 ## Changes to the game module
 
 Canonical assembly is where the control-character rule becomes load-bearing, so it
@@ -300,19 +397,30 @@ Parsing and assembly are unit tests throughout: neither touches HTTP or the
 database, so no Spring context and no Testcontainers. The one exception is
 `GameSchemaIT`, which already exists and gains cases for the `V3` constraints.
 
+**`PgnTagReaderTest`** — the tag pair section reads into a map; escaped `\"` and
+`\\` inside values; values containing brackets; a missing section; tags spread over
+irregular whitespace; the raw `Round` value `3.2` surviving intact, which is the
+whole reason this class exists.
+
+**`PgnTagValuesTest`** — date, rating and optional-tag normalisation, including
+`????.??.??`, a partial date, the impossible `2026.02.30`, `?` and blank values, and
+a non-numeric rating.
+
 **`ChesslibPgnParserTest`** — a real PGN parses to the expected tags, movetext and
 result; movetext normalisation, including `O-O`, `=Q` promotion and check suffixes;
-one case per row of the validation table; date, rating and optional-tag
-normalisation; null and blank input; an annotated game parsing with its comments,
-NAGs and variations dropped from `movetext`.
+one case per row of the validation table; null and blank input; an annotated game
+parsing with its comments, NAGs and variations dropped from `movetext`.
 
 **`ChesslibContractTest`** — one test per constraint in ADR 0001, expressed through
 our API rather than the library's, so a library upgrade that regresses one fails our
 build instead of corrupting a game:
 
-1. A pawn moving three squares is rejected, rather than accepted as `doMove` would.
-2. SAN capturing the king surfaces as a `Rejected`, not as
-   `ArrayIndexOutOfBoundsException`.
+1. `1. e5` — a pawn moving three squares — is `Rejected` with `ILLEGAL_MOVE` at
+   ply 1. This is the test that matters most: chesslib accepts this input through
+   every path it offers, so the test passes only while our own replay loop exists,
+   and fails the moment someone removes it as redundant.
+2. SAN capturing the king surfaces as a `Rejected`, whatever unchecked exception the
+   library chose to throw and wherever it threw it.
 3. A document whose movetext is invalid is `Rejected` — the lazy-validation trap,
    where a `Game` is returned before its moves have been read.
 4. A terminal result token in the document does not leak into `movetext`.
