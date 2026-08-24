@@ -12,6 +12,9 @@ import org.junit.jupiter.api.Test;
 
 class ChesslibPgnParserTest {
 
+    /** Written numerically because the character itself is invisible in source. */
+    private static final String BYTE_ORDER_MARK = Character.toString(0xFEFF);
+
     private final ChesslibPgnParser parser = new ChesslibPgnParser();
 
     private ParsedGame parsed(String pgn) {
@@ -94,6 +97,29 @@ class ChesslibPgnParserTest {
                     """;
 
             assertThat(parsed(annotated).movetext()).isEqualTo("1. e4 e5 2. Nf3");
+        }
+
+        /**
+         * ChessBase and Windows exports routinely carry a byte order mark, and
+         * {@code \s} does not match it, so the first line would fail the tag
+         * pattern and its tag would be silently discarded.
+         */
+        @Test
+        void readsADocumentCarryingAByteOrderMarkIdenticallyToOneWithout() {
+            assertThat(parsed(BYTE_ORDER_MARK + COMPLETE)).isEqualTo(parsed(COMPLETE));
+        }
+
+        @Test
+        void readsTheFirstTagOfAByteOrderMarkedDocumentRatherThanLosingIt() {
+            String marked = BYTE_ORDER_MARK + """
+                    [White "Green, Guy"]
+                    [Black "Club Opponent"]
+                    [Result "1-0"]
+
+                    1. e4 e5 1-0
+                    """;
+
+            assertThat(parsed(marked).whiteName()).isEqualTo("Green, Guy");
         }
 
         @Test

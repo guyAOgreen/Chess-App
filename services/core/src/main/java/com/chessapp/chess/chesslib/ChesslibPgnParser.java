@@ -36,19 +36,39 @@ public class ChesslibPgnParser implements PgnParser {
     /** The PGN marker for an unknown tag value. */
     private static final String UNKNOWN = "?";
 
+    /**
+     * The UTF-8 byte order mark, written numerically because the character itself
+     * is invisible in source.
+     */
+    private static final String BYTE_ORDER_MARK = Character.toString(0xFEFF);
+
     @Override
     public PgnParseResult parse(String pgn) {
-        if (pgn == null || pgn.isBlank()) {
+        if (pgn == null) {
+            return rejected(PgnErrorCode.NOT_PGN, "no PGN text was supplied");
+        }
+        // ChessBase and Windows exports routinely begin with a byte order mark,
+        // and \s does not match it, so the FIRST line alone would fail the tag
+        // pattern: [Event "..."] would be silently discarded into the movetext
+        // while every later tag read normally, and a marked [White "..."] would
+        // be reported as PLAYER_UNKNOWN, which tells the user nothing about the
+        // real problem. Stripped once, here, before anything reads the document,
+        // so no reader downstream has to know about it.
+        String document = pgn.startsWith(BYTE_ORDER_MARK)
+                ? pgn.substring(BYTE_ORDER_MARK.length())
+                : pgn;
+        if (document.isBlank()) {
             return rejected(PgnErrorCode.NOT_PGN, "no PGN text was supplied");
         }
 
-        // Computed from the ORIGINAL pgn argument and never reassigned: everything
+        // Computed from the document AS SUBMITTED — nothing removed but the byte
+        // order mark — and never reassigned: everything
         // downstream that decides the declared result (the NO_MOVES check, the
         // UNREADABLE_MOVE guard, and result resolution at the bottom of this
         // method) must keep reading what the document actually said, not the
         // token readGames may append below purely to make chesslib parse the
         // moves. Do not let a normalised copy leak into these variables.
-        String movetext = PgnTagReader.movetext(pgn);
+        String movetext = PgnTagReader.movetext(document);
         String terminalToken = terminalToken(movetext);
         // Normalisation is needed only when there is a movetext section to give
         // chesslib a token to find. A tags-only document (no movetext at all) must
@@ -63,7 +83,7 @@ public class ChesslibPgnParser implements PgnParser {
 
         List<Game> games;
         try {
-            games = readGames(pgn, needsNormalization);
+            games = readGames(document, needsNormalization);
         } catch (RuntimeException unreadable) {
             return rejected(PgnErrorCode.NOT_PGN,
                     "the text could not be read as PGN: " + unreadable.getMessage());
@@ -77,7 +97,7 @@ public class ChesslibPgnParser implements PgnParser {
         }
 
         Game game = games.get(0);
-        Map<String, String> tags = PgnTagReader.tags(pgn);
+        Map<String, String> tags = PgnTagReader.tags(document);
         // chesslib parses arbitrary text with no tag pairs into a Game with zero
         // half-moves rather than throwing (verified empirically): "this is not a
         // chess game" yields fen=null, property=null and an empty half-move list
