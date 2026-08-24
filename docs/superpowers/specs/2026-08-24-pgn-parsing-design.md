@@ -248,7 +248,10 @@ assumes the obvious thing:
   checks both, and the tag reader sees them anyway.
 
 `ply` is a 1-based half-move index — ply 1 is White's first move — and is null for
-errors that are not about a specific move. `message` is written for a person
+errors that are not about a specific move. `ILLEGAL_MOVE` always carries one,
+because our own replay loop knows exactly where it stopped. `UNREADABLE_MOVE`
+carries one only when the library says where it failed, which it often does not;
+the message always carries the offending text. `message` is written for a person
 looking at their own file, and names the move number and SAN where it has them.
 
 `movetext` satisfies the rules `Game.movetext` enforces: SAN with move numbers, no
@@ -268,7 +271,7 @@ ones — are not returned. ADR 0002 keeps them recoverable from `source_pgn`, wh
 | `MULTIPLE_GAMES` | The document holds more than one game | null |
 | `NON_STANDARD_START_POSITION` | `SetUp` or `FEN` is present | null |
 | `NO_MOVES` | The game has no moves | null |
-| `UNREADABLE_MOVE` | SAN at this ply cannot be understood | set |
+| `UNREADABLE_MOVE` | SAN at this ply cannot be understood | best effort |
 | `ILLEGAL_MOVE` | SAN at this ply is not legal in the reconstructed position | set |
 | `PLAYER_UNKNOWN` | `White` or `Black` is absent, blank or `?` | null |
 | `RESULT_MISSING` | Neither a `Result` tag nor a terminal token is present | null |
