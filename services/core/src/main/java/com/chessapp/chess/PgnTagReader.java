@@ -19,8 +19,24 @@ import java.util.regex.Pattern;
  */
 public final class PgnTagReader {
 
+    /**
+     * The possessive quantifiers in the value group are load-bearing and must not
+     * be "simplified" away.
+     *
+     * <p>The natural spelling of a PGN string token, {@code (?:[^"\\]|\\.)*},
+     * recurses once per character in {@code java.util.regex}: it overflows the
+     * stack somewhere under two thousand characters, which is a perfectly valid
+     * tag value in a document of about two kilobytes. {@link #tags} promises never
+     * to throw for bad input, and {@code StackOverflowError} is an {@code Error}
+     * that the parser deliberately does not catch, so that overflow would escape
+     * a future upload endpoint as a denial of service.
+     *
+     * <p>The unrolled, possessive form matches exactly the same values —
+     * characters that are neither a quote nor a backslash, and backslash escapes —
+     * without a stack frame per character. Verified at 100,000 characters.
+     */
     private static final Pattern TAG_PAIR = Pattern.compile(
-            "^\\s*\\[\\s*([A-Za-z0-9_]+)\\s+\"((?:[^\"\\\\]|\\\\.)*)\"\\s*]\\s*$");
+            "^\\s*\\[\\s*([A-Za-z0-9_]+)\\s+\"([^\"\\\\]*+(?:\\\\.[^\"\\\\]*+)*+)\"\\s*]\\s*$");
 
     private PgnTagReader() {
     }

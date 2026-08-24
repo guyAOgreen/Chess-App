@@ -66,6 +66,27 @@ class PgnTagReaderTest {
                 .containsEntry("Event", "First");
     }
 
+    /**
+     * A tag value long enough to overflow a recursive matcher. The pattern's value
+     * group must not recurse once per character: a valid PGN document of a couple
+     * of kilobytes would otherwise throw StackOverflowError, which parse() does not
+     * catch, breaking the promise that bad input never throws.
+     */
+    @Test
+    void readsAVeryLongTagValueWithoutOverflowingTheStack() {
+        String longValue = "x".repeat(100_000);
+
+        assertThat(PgnTagReader.tags("[Event \"" + longValue + "\"]\n"))
+                .containsEntry("Event", longValue);
+    }
+
+    @Test
+    void separatesMovetextFromAVeryLongTagValueWithoutOverflowingTheStack() {
+        String document = "[Event \"" + "x".repeat(100_000) + "\"]\n\n1. e4 e5 1-0\n";
+
+        assertThat(PgnTagReader.movetext(document)).isEqualTo("1. e4 e5 1-0");
+    }
+
     @Test
     void returnsEverythingOutsideTheTagPairSectionAsMovetext() {
         assertThat(PgnTagReader.movetext(GAME)).isEqualTo("1. e4 e5 2. Nf3 Nc6 1-0");
