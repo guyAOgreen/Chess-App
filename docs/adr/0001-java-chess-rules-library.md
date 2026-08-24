@@ -107,8 +107,9 @@ These are the reasons the wrapper is not optional.
    `ArrayIndexOutOfBoundsException` during move loading, so error handling must wrap
    the iteration. A game with no moves throws `NullPointerException` inside
    `loadMoveText()`. Recognition will produce exactly this kind of
-   nonsense. The wrapper must catch `RuntimeException`, not just the declared
-   checked exception, and translate to a domain error.
+   nonsense. The wrapper must catch `RuntimeException` and translate to a domain error.
+   Nothing here needs declaring, and nothing may be left uncaught on the
+   assumption that it would be.
 
 3. **`PgnIterator` validates lazily.** Iterating yields a `Game` without having
    verified its movetext; the failure surfaces later, when the half-moves are read.
