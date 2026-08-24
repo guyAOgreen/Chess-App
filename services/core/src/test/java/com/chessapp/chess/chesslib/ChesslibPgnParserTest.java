@@ -184,6 +184,30 @@ class ChesslibPgnParserTest {
         }
 
         @Test
+        void rejectsADocumentWithNoMovetextSectionAtAllAsHavingNoMoves() {
+            String tagsOnly = """
+                    [White "A"]
+                    [Black "B"]
+                    [Result "1-0"]
+                    """;
+
+            assertThat(rejectedCode(tagsOnly)).isEqualTo(PgnErrorCode.NO_MOVES);
+        }
+
+        @Test
+        void rejectsMovetextThatCarriesOnlyAnnotationsAndNoActualMoves() {
+            String annotationsOnly = """
+                    [White "A"]
+                    [Black "B"]
+                    [Result "*"]
+
+                    {no moves here} *
+                    """;
+
+            assertThat(rejectedCode(annotationsOnly)).isEqualTo(PgnErrorCode.UNREADABLE_MOVE);
+        }
+
+        @Test
         void rejectsAnIllegalMoveAndSaysWhereItIs() {
             String illegal = """
                     [White "A"]

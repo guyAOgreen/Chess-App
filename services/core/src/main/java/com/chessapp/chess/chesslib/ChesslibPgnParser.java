@@ -49,10 +49,20 @@ public class ChesslibPgnParser implements PgnParser {
         // moves. Do not let a normalised copy leak into these variables.
         String movetext = PgnTagReader.movetext(pgn);
         String terminalToken = terminalToken(movetext);
+        // Normalisation is needed only when there is a movetext section to give
+        // chesslib a token to find. A tags-only document (no movetext at all) must
+        // be handed to chesslib UNCHANGED: appending " *" to the whole document
+        // would land the token on the last TAG line, which PgnIterator cannot
+        // parse, misreporting a genuinely moveless game as NOT_PGN instead of
+        // NO_MOVES (verified empirically). Without normalisation chesslib parses a
+        // tags-only document to zero half-moves without throwing, and the NO_MOVES
+        // check below - deliberately still in the moves phase, not moved earlier -
+        // catches it exactly as it did before this document shape was considered.
+        boolean needsNormalization = !movetext.isBlank() && terminalToken == null;
 
         List<Game> games;
         try {
-            games = readGames(pgn, terminalToken != null);
+            games = readGames(pgn, needsNormalization);
         } catch (RuntimeException unreadable) {
             return rejected(PgnErrorCode.NOT_PGN,
                     "the text could not be read as PGN: " + unreadable.getMessage());
@@ -158,14 +168,22 @@ public class ChesslibPgnParser implements PgnParser {
      * {@code Game.getMoveText()} stays null and the later {@code loadMoveText()}
      * call is a documented no-op that neither parses anything nor throws (verified
      * empirically: a document with real, legal moves but no trailing token yields
-     * zero half-moves and no error). So when the caller reports the document has
-     * no terminal token of its own, a {@code *} is appended to a LOCAL COPY of the
-     * text before handing it to chesslib, purely to make the library's parse gate
-     * fire. The caller's own reading of the document — what result it actually
-     * declared — must never be derived from this copy.
+     * zero half-moves and no error). So when the caller has a non-blank movetext
+     * section with no terminal token of its own, a {@code *} is appended to a LOCAL
+     * COPY of the text before handing it to chesslib, purely to make the library's
+     * parse gate fire. The caller's own reading of the document — what result it
+     * actually declared — must never be derived from this copy.
+     *
+     * <p>A tags-only document (no movetext section at all) must never be
+     * normalised: appending {@code *} to the whole document lands it on the last
+     * TAG line, which {@code PgnIterator} cannot parse, turning a genuinely
+     * moveless game into a spurious parse failure (verified empirically). The
+     * caller decides {@code needsNormalization} accordingly, so it is false both
+     * when a terminal token is already present and when there is no movetext to
+     * normalise in the first place.
      */
-    private static List<Game> readGames(String pgn, boolean hasTerminalToken) {
-        String forChesslib = hasTerminalToken ? pgn : pgn.stripTrailing() + " *";
+    private static List<Game> readGames(String pgn, boolean needsNormalization) {
+        String forChesslib = needsNormalization ? pgn.stripTrailing() + " *" : pgn;
         List<Game> games = new ArrayList<>();
         try (PgnIterator iterator = new PgnIterator(List.of(forChesslib.split("\\R", -1)))) {
             for (Game game : iterator) {
