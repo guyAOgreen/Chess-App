@@ -94,6 +94,21 @@ Resolution of names to players stays in #7. The check here is only that the
 document names both players, which turns an eventual foreign-key or check-constraint
 failure into a clear message about the file the user submitted.
 
+### 8. M1 accepts only the standard initial position
+
+PGN can describe a game that starts from another position with the `SetUp` and
+`FEN` tags. The current `Game` model stores neither the initial position nor those
+tags, and canonical assembly deliberately emits only modelled metadata. Accepting
+such a document would therefore create `movetext` that is valid only from an
+unstored position and cannot be replayed from the assembled PGN.
+
+The parser rejects any document containing either `SetUp` or `FEN`, including a
+redundant standard-position FEN. This deliberately narrow rule avoids defining
+the inconsistent combinations (`SetUp` without `FEN`, `FEN` without `SetUp`, or
+`SetUp "0"` with `FEN`) when M1 has no use case for any of them. Supporting composed
+positions later requires modelling the initial position on `Game`, updating the
+assembler, and adding replay and persistence tests as one coherent change.
+
 ## Package layout
 
 ```text
@@ -144,6 +159,18 @@ public record ParsedGame(String event,
 public record PgnError(PgnErrorCode code, String message, Integer ply) {}
 ```
 
+All record values returned by a successful parse are immutable values owned by
+the application; no chesslib object or mutable collection crosses the boundary.
+`parse(null)`, blank input and text containing no readable game return
+`Rejected(NOT_PGN, ...)` rather than throwing.
+
+The wrapper catches `RuntimeException` and translates it, per ADR 0001's constraint
+that chesslib signals some failures with an unchecked
+`ArrayIndexOutOfBoundsException` rather than the declared checked exception. It does
+not catch `Error`. That is the whole rule: a defect in our own code and a defect in
+chesslib arrive through the same frames with the same types, so there is no runtime
+test that separates them, and no attempt should be made to write one.
+
 `ply` is a 1-based half-move index — ply 1 is White's first move — and is null for
 errors that are not about a specific move. `message` is written for a person
 looking at their own file, and names the move number and SAN where it has them.
@@ -163,6 +190,7 @@ ones — are not returned. ADR 0002 keeps them recoverable from `source_pgn`, wh
 | --- | --- | --- |
 | `NOT_PGN` | No game can be read from the text | null |
 | `MULTIPLE_GAMES` | The document holds more than one game | null |
+| `NON_STANDARD_START_POSITION` | `SetUp` or `FEN` is present | null |
 | `NO_MOVES` | The game has no moves | null |
 | `UNREADABLE_MOVE` | SAN at this ply cannot be understood | set |
 | `ILLEGAL_MOVE` | SAN at this ply is not legal in the reconstructed position | set |
@@ -173,8 +201,9 @@ ones — are not returned. ADR 0002 keeps them recoverable from `source_pgn`, wh
 
 Only the first problem found is reported, and the order is fixed so the same
 document always produces the same error: document structure (`NOT_PGN`,
-`MULTIPLE_GAMES`), then moves (`NO_MOVES`, `UNREADABLE_MOVE`, `ILLEGAL_MOVE`), then
-tags (`PLAYER_UNKNOWN`), then the result. Moves come before tags because a file
+`MULTIPLE_GAMES`, `NON_STANDARD_START_POSITION`), then moves (`NO_MOVES`,
+`UNREADABLE_MOVE`, `ILLEGAL_MOVE`), then tags (`PLAYER_UNKNOWN`), then the result.
+Moves come before player and result tags because a file
 whose moves do not reconstruct is broken in a way the user must fix first, and
 because the result checks need the reconstructed final position.
 
@@ -211,6 +240,27 @@ draw agreement are not derivable from the board.
 2. `WhiteElo`, `BlackElo` and `ECO` when known.
 3. A blank line, `movetext`, then the result token from the `result` column.
 
+Tag values are escaped according to PGN string rules: `\` becomes `\\` and `"`
+becomes `\"`. Assembly uses `\n` line endings and ends with one trailing newline,
+so identical `Game` values produce byte-for-byte identical text on every platform.
+
+Escaping alone is not enough, for a reason worth stating precisely. Escaping does
+prevent tag-pair injection: an escaped `"` cannot close the string, so no value can
+break out and forge a tag. The problem with a line break is validity rather than
+injection — the PGN specification defines a string token as printing characters
+between quotation marks, so an embedded newline makes the document invalid whatever
+the escaping, and line-oriented readers mis-parse it.
+
+So the values that become tags reject control characters outright: `GameSide.name`,
+which supplies the `White` and `Black` tags, and `Event`, `Site`, `Round` and `ECO`.
+That is the whole of the `Game` aggregate's contribution to the tag pair section.
+
+`Player.displayName` is deliberately **not** included. A player's stored name never
+reaches a PGN document — the tags come from the game-time snapshot on `Game`, which
+is the point of storing snapshots at all. There may be good reasons to reject
+control characters in display names, from search behaviour to the unique index, but
+they are not PGN reasons and do not belong to this change.
+
 Game-time name snapshots supply `White` and `Black`, so a later rename or player
 merge does not rewrite historical exports.
 
@@ -224,16 +274,37 @@ assembly is ours.
 `com.github.bhlangonijr:chesslib:1.3.7`, pinned exactly — never a branch reference
 or `-SNAPSHOT`, per ADR 0001.
 
+## Changes to the game module
+
+Canonical assembly is where the control-character rule becomes load-bearing, so it
+is added here rather than left for the first malformed export to find.
+
+`GameValues` rejects control characters in `GameSide.name` and in the optional tags
+`Event`, `Site`, `Round` and `ECO`. `GameTest`, `NewGameTest` and `GameSideTest`
+gain cases for it, on both newly created and rehydrated values.
+
+**A Flyway migration `V3` adds the matching `CHECK` constraints**, because #5
+established that every domain rule is mirrored in the database, and a domain rule
+without one leaves the two disagreeing — the divergence found in review on #35, and
+the reason `movetext` validation had to be rewritten. `GameSchemaIT` gains a case
+per constraint.
+
+The constraints cannot reuse the `btrim` idiom from `V2`. PostgreSQL's single
+argument `btrim` strips spaces only, while Java's `trim()` strips every character up
+to and including the space, so the two are not equivalent for tabs and newlines. The
+rule needs an explicit pattern, `!~ '[[:cntrl:]]'`.
+
 ## Testing
 
-All unit tests. Nothing here touches HTTP or the database, so no Spring context and
-no Testcontainers.
+Parsing and assembly are unit tests throughout: neither touches HTTP or the
+database, so no Spring context and no Testcontainers. The one exception is
+`GameSchemaIT`, which already exists and gains cases for the `V3` constraints.
 
 **`ChesslibPgnParserTest`** — a real PGN parses to the expected tags, movetext and
 result; movetext normalisation, including `O-O`, `=Q` promotion and check suffixes;
 one case per row of the validation table; date, rating and optional-tag
-normalisation; an annotated game parsing with its comments, NAGs and variations
-dropped from `movetext`.
+normalisation; null and blank input; an annotated game parsing with its comments,
+NAGs and variations dropped from `movetext`.
 
 **`ChesslibContractTest`** — one test per constraint in ADR 0001, expressed through
 our API rather than the library's, so a library upgrade that regresses one fails our
@@ -251,7 +322,8 @@ build instead of corrupting a game:
 6. Concurrent parses do not interfere, pinning the one-`Board`-per-operation rule.
 
 **`CanonicalPgnTest`** — tag order, unknown-value conventions, optional tags present
-and absent, and the result token for each `GameResult`.
+and absent, escaping quotes and backslashes, deterministic line endings and the
+result token for each `GameResult`.
 
 **`PgnRoundTripTest`** — parse, build a `Game`, assemble, parse again: the same
 movetext and result both times. This is the property that makes "a game has exactly
@@ -278,6 +350,8 @@ one canonical PGN" true in practice rather than by assertion.
   `source_pgn`.
 * Comments, NAGs and variations do not reach canonical PGN, so an annotated import
   replays without its annotations until they are modelled.
+* Games beginning from a `FEN` position are rejected until `Game` can retain and
+  emit their initial position.
 * Emitted movetext is not wrapped at 80 columns. Readers accept long lines, and
   wrapping is cosmetic until an export feature asks for it.
 * A move that is legal but absurd is accepted, because it is legal. Deciding that a
