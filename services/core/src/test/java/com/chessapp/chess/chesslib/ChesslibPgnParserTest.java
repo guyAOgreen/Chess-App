@@ -244,6 +244,45 @@ class ChesslibPgnParserTest {
         }
 
         @Test
+        void rejectsAGameTruncatedByASemicolonCommentRatherThanStoringTheMovesBeforeIt() {
+            // chesslib treats ";" as commenting out the remainder of the WHOLE
+            // movetext rather than the remainder of the line, so it reads three
+            // half-moves from this six-move game and reports no error at all.
+            String semicolon = """
+                    [White "A"]
+                    [Black "B"]
+                    [Result "1-0"]
+
+                    1. e4 e5 2. Nf3 ; developing
+                    2... Nc6 3. Bb5 a6 1-0
+                    """;
+
+            PgnParseResult result = parser.parse(semicolon);
+
+            assertThat(result).isInstanceOfSatisfying(PgnParseResult.Rejected.class, rejected -> {
+                assertThat(rejected.error().code()).isEqualTo(PgnErrorCode.UNREADABLE_MOVE);
+                assertThat(rejected.error().message()).contains("6").contains("3");
+                assertThat(rejected.error().ply()).isEqualTo(4);
+            });
+        }
+
+        @Test
+        void rejectsAGameWhoseMovesChesslibStoppedReadingPartWayThrough() {
+            // Z0 is the ChessBase null move. chesslib stops at it silently, keeping
+            // the two half-moves before it, so only counting what we submitted
+            // catches the loss.
+            String nullMove = """
+                    [White "A"]
+                    [Black "B"]
+                    [Result "1-0"]
+
+                    1. e4 e5 2. Z0 1-0
+                    """;
+
+            assertThat(rejectedCode(nullMove)).isEqualTo(PgnErrorCode.UNREADABLE_MOVE);
+        }
+
+        @Test
         void rejectsAGameWhosePlayerIsUnknown() {
             String unknown = """
                     [White "?"]

@@ -3,6 +3,7 @@ package com.chessapp.chess.chesslib;
 import com.chessapp.chess.ParsedGame;
 import com.chessapp.chess.PgnError;
 import com.chessapp.chess.PgnErrorCode;
+import com.chessapp.chess.PgnMoveCounter;
 import com.chessapp.chess.PgnParseResult;
 import com.chessapp.chess.PgnParser;
 import com.chessapp.chess.PgnTagReader;
@@ -113,6 +114,25 @@ public class ChesslibPgnParser implements PgnParser {
             if (game.getHalfMoves().isEmpty()) {
                 return rejected(PgnErrorCode.UNREADABLE_MOVE,
                         "the moves could not be read from the movetext");
+            }
+            // Reading SOME moves is not reading the game. chesslib can stop part
+            // way through a movetext and report success: it treats ";" as
+            // commenting out the remainder of the whole movetext rather than the
+            // remainder of the line, and it silently keeps what it had when it
+            // meets a token it cannot decode, such as the ChessBase null move Z0
+            // (both verified empirically). Either way a real game would be stored
+            // with its later moves missing. So the moves the document submitted
+            // are counted from OUR movetext, by the specification's rules rather
+            // than the library's, and a disagreement is a rejection — the project
+            // rejects rather than repairs, so no attempt is made to feed chesslib
+            // corrected text.
+            int submitted = PgnMoveCounter.count(movetext);
+            int read = game.getHalfMoves().size();
+            if (submitted != read) {
+                return rejected(PgnErrorCode.UNREADABLE_MOVE,
+                        "the movetext submits " + submitted + " moves but " + read
+                                + " could be read",
+                        read < submitted ? read + 1 : null);
             }
             moves = ValidatedMoves.of(game.getHalfMoves());
         } catch (IllegalMoveAtPly illegal) {
