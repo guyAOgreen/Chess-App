@@ -9,6 +9,7 @@ import com.chessapp.game.domain.GameResult;
 import com.chessapp.game.domain.GameSource;
 import com.chessapp.player.domain.PlayerRepository;
 import java.time.LocalDate;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -78,5 +79,93 @@ class ImportPgnIT {
         assertThat(game.eco()).isEqualTo("C60");
         assertThat(game.source()).isEqualTo(GameSource.PGN_IMPORT);
         assertThat(game.movetext()).isEqualTo("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6");
+    }
+
+    @Test
+    void persistsTheGameSoItCanBeReadBack() {
+        Game game = imported(pgn("Readback White", "Readback Black"));
+
+        Game found = games.findById(game.id()).orElseThrow();
+
+        assertThat(found).isEqualTo(game);
+    }
+
+    @Test
+    void createsBothPlayers() {
+        imported(pgn("Created White", "Created Black"));
+
+        assertThat(players.findByDisplayName("Created White")).isPresent();
+        assertThat(players.findByDisplayName("Created Black")).isPresent();
+    }
+
+    @Test
+    void reusesAPlayerAlreadyStoredRatherThanCreatingASecond() {
+        UUID first = imported(pgn("Repeat White", "Repeat Black One")).white().playerId();
+
+        UUID second = imported(pgn("Repeat White", "Repeat Black Two")).white().playerId();
+
+        assertThat(second).isEqualTo(first);
+    }
+
+    /**
+     * Legal, if unusual, PGN. One player row is resolved for both colours rather
+     * than the import failing.
+     */
+    @Test
+    void storesAGameWhoseTwoColoursNameTheSamePlayer() {
+        Game game = imported(pgn("Self Opponent", "Self Opponent"));
+
+        assertThat(game.white().playerId()).isEqualTo(game.black().playerId());
+    }
+
+    /**
+     * {@code sourcePgn} is provenance, so it is the submitted value unchanged — a
+     * byte order mark included. It is the deserialised string, not the original
+     * HTTP bytes: at this layer there is no encoding left to preserve.
+     */
+    @Test
+    void keepsTheSubmittedDocumentUnchangedAsProvenance() {
+        String submitted = "﻿" + pgn("Provenance White", "Provenance Black");
+
+        Game game = imported(submitted);
+
+        assertThat(game.sourcePgn()).isEqualTo(submitted);
+        assertThat(game.movetext())
+                .as("movetext is canonical, not a copy of what was submitted")
+                .isEqualTo("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6");
+    }
+
+    @Test
+    void returnsTheParserRejectionRatherThanThrowing() {
+        String illegal = """
+                [White "Illegal White"]
+                [Black "Illegal Black"]
+                [Result "*"]
+
+                1. e4 e5 2. Nf3 Nc6 3. e6 *
+                """;
+
+        PgnImportResult result = importPgn.execute(illegal);
+
+        assertThat(result).isInstanceOfSatisfying(PgnImportResult.Rejected.class, rejected -> {
+            assertThat(rejected.error().code()).isEqualTo(PgnErrorCode.ILLEGAL_MOVE);
+            assertThat(rejected.error().ply()).isEqualTo(5);
+        });
+    }
+
+    @Test
+    void leavesTheDatabaseUntouchedWhenTheDocumentIsRejected() {
+        String illegal = """
+                [White "Untouched White"]
+                [Black "Untouched Black"]
+                [Result "*"]
+
+                1. e4 e5 2. Nf3 Nc6 3. e6 *
+                """;
+
+        importPgn.execute(illegal);
+
+        assertThat(players.findByDisplayName("Untouched White")).isEmpty();
+        assertThat(players.findByDisplayName("Untouched Black")).isEmpty();
     }
 }
