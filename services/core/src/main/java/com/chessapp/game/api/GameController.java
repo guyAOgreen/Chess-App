@@ -64,7 +64,7 @@ public class GameController {
      * presence rather than on a null.
      */
     private static ResponseEntity<Object> invalidPgn(PgnError error) {
-        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.UNPROCESSABLE_ENTITY);
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.UNPROCESSABLE_CONTENT);
         problem.setType(INVALID_PGN);
         problem.setTitle("Invalid PGN");
         problem.setDetail(error.message());
@@ -72,7 +72,7 @@ public class GameController {
         if (error.ply() != null) {
             problem.setProperty("ply", error.ply());
         }
-        return ResponseEntity.unprocessableEntity()
+        return ResponseEntity.unprocessableContent()
                 .contentType(MediaType.APPLICATION_PROBLEM_JSON)
                 .body(problem);
     }

@@ -139,7 +139,7 @@ class GameApiIT {
                 """;
 
         importing(illegal)
-                .andExpect(status().isUnprocessableEntity())
+                .andExpect(status().isUnprocessableContent())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.type").value("/errors/invalid-pgn"))
                 .andExpect(jsonPath("$.title").value("Invalid PGN"))
@@ -164,7 +164,7 @@ class GameApiIT {
                 """;
 
         importing(noMoves)
-                .andExpect(status().isUnprocessableEntity())
+                .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.code").value("NO_MOVES"))
                 .andExpect(jsonPath("$.ply").doesNotExist());
     }
@@ -180,7 +180,7 @@ class GameApiIT {
                 """;
 
         importing(unknown)
-                .andExpect(status().isUnprocessableEntity())
+                .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.code").value("PLAYER_UNKNOWN"));
     }
 
@@ -201,7 +201,7 @@ class GameApiIT {
                 """;
 
         importing(two)
-                .andExpect(status().isUnprocessableEntity())
+                .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.code").value("MULTIPLE_GAMES"));
     }
 
@@ -215,7 +215,7 @@ class GameApiIT {
                 """;
 
         importing(none)
-                .andExpect(status().isUnprocessableEntity())
+                .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.code").value("RESULT_MISSING"));
     }
 
@@ -224,7 +224,7 @@ class GameApiIT {
         mockMvc.perform(post("/api/games")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
-                .andExpect(status().isUnprocessableEntity())
+                .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.code").value("NOT_PGN"));
     }
 
@@ -252,7 +252,7 @@ class GameApiIT {
                 """.formatted(Character.toString(0x2028));
 
         importing(separator)
-                .andExpect(status().isUnprocessableEntity())
+                .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.code").value("NOT_PGN"));
     }
 }
