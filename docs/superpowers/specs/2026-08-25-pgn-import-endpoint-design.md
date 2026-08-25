@@ -84,6 +84,14 @@ Two error formats on one API is worse than either, and a client written against
 one of them will mis-handle the other. Enabling it is a one-line change to
 `application.yml` and is part of this issue rather than a later tidy-up.
 
+This setting registers a `ProblemDetail` handler for the exceptions Spring MVC
+itself raises — the malformed-body, wrong-method and wrong-content-type cases
+above, mapped to 400/405/415. It does not change how any other failure is
+rendered. An exception that is not one of MVC's own — including any unhandled
+exception that would otherwise become a 500 — still falls through to
+`BasicErrorController` and gets the legacy `{"timestamp","error","path"}` body.
+Two error formats therefore still coexist for that case; see "Known limitations".
+
 ### 4. 422 for an unusable game, 400 for an unusable request
 
 A well-formed JSON body carrying a PGN that cannot become a `Game` is
@@ -462,6 +470,17 @@ this — `server.max-http-post-size` has been deprecated at error level since 3.
 and `server.tomcat.max-http-form-post-size` applies to form content only — so it
 needs a reverse proxy limit or a servlet filter. Tracked as a deployment
 prerequisite alongside #25 rather than left to be rediscovered.
+
+**The API still has two error shapes for a 500.** `spring.mvc.problemdetails.enabled`
+(decision 3) covers only Spring MVC's own exceptions — 400, 405, 415. An unhandled
+exception reaching the container still routes to `BasicErrorController` and
+returns the legacy `{"timestamp","error","path"}` body, not problem+json. The
+analysis in "Why the parser cannot produce a game the domain rejects" concludes
+this endpoint has no reachable non-bug path to a 500 today, so the gap is not
+currently observable — but a future change that makes one reachable would ship a
+response in the shape decision 3 set out to eliminate. Closing it needs either a
+`@RestControllerAdvice` for `Exception` or an `ErrorController` that renders
+problem+json, and is deferred until something can actually trigger a 500.
 
 ## Out of scope
 
