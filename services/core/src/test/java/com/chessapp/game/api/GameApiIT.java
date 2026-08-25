@@ -123,4 +123,136 @@ class GameApiIT {
                 .andExpect(jsonPath("$.sourcePgn").doesNotExist())
                 .andExpect(jsonPath("$.pgn").doesNotExist());
     }
+
+    /**
+     * The fixture and its ply are taken from ChesslibPgnParserTest, where the same
+     * document is already pinned to ILLEGAL_MOVE at ply 5 — e4 cannot reach e6.
+     */
+    @Test
+    void answersUnprocessableContentWithTheCodeAndPlyForAnIllegalMove() throws Exception {
+        String illegal = """
+                [White "Reject Illegal White"]
+                [Black "Reject Illegal Black"]
+                [Result "*"]
+
+                1. e4 e5 2. Nf3 Nc6 3. e6 *
+                """;
+
+        importing(illegal)
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("/errors/invalid-pgn"))
+                .andExpect(jsonPath("$.title").value("Invalid PGN"))
+                .andExpect(jsonPath("$.status").value(422))
+                .andExpect(jsonPath("$.detail").isNotEmpty())
+                .andExpect(jsonPath("$.code").value("ILLEGAL_MOVE"))
+                .andExpect(jsonPath("$.ply").value(5));
+    }
+
+    /**
+     * A rejection that is not about a specific move omits ply rather than sending
+     * null, so a client can branch on presence.
+     */
+    @Test
+    void omitsPlyWhenTheProblemIsNotAboutAMove() throws Exception {
+        String noMoves = """
+                [White "Reject Moveless White"]
+                [Black "Reject Moveless Black"]
+                [Result "*"]
+
+                *
+                """;
+
+        importing(noMoves)
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("NO_MOVES"))
+                .andExpect(jsonPath("$.ply").doesNotExist());
+    }
+
+    @Test
+    void rejectsADocumentThatNamesNoPlayer() throws Exception {
+        String unknown = """
+                [White "?"]
+                [Black "Reject Unknown Black"]
+                [Result "1-0"]
+
+                1. e4 e5 1-0
+                """;
+
+        importing(unknown)
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("PLAYER_UNKNOWN"));
+    }
+
+    @Test
+    void rejectsAFileHoldingMoreThanOneGame() throws Exception {
+        String two = """
+                [White "Reject Multi White"]
+                [Black "Reject Multi Black"]
+                [Result "1-0"]
+
+                1. e4 e5 1-0
+
+                [White "Reject Multi White Two"]
+                [Black "Reject Multi Black Two"]
+                [Result "0-1"]
+
+                1. d4 d5 0-1
+                """;
+
+        importing(two)
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("MULTIPLE_GAMES"));
+    }
+
+    @Test
+    void rejectsAGameThatDeclaresNoResult() throws Exception {
+        String none = """
+                [White "Reject Resultless White"]
+                [Black "Reject Resultless Black"]
+
+                1. e4 e5
+                """;
+
+        importing(none)
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("RESULT_MISSING"));
+    }
+
+    @Test
+    void treatsAnAbsentPgnFieldAsAnEmptyDocument() throws Exception {
+        mockMvc.perform(post("/api/games")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("NOT_PGN"));
+    }
+
+    /**
+     * U+2028 is a line terminator that Java's \\R matches but
+     * Character.isISOControl does not, so PgnTagValues lets it through where
+     * GameValues would reject it. It cannot reach domain construction: the tag is
+     * split across two lines, matches the tag pattern on neither, and the orphaned
+     * fragments land in the movetext section where chesslib fails on them.
+     *
+     * <p>The assertion is that this is a 422 and not a 500 — that the document
+     * never reaches NewGame. Verified empirically against ChesslibPgnParser before
+     * this test was written; the first version of the analysis had the mechanism
+     * wrong while reaching the right conclusion, which is why it is pinned here.
+     */
+    @Test
+    void rejectsALineSeparatorInATagRatherThanFailingInsideTheDomain() throws Exception {
+        String separator = """
+                [Event "Club%sChampionship"]
+                [White "Reject Separator White"]
+                [Black "Reject Separator Black"]
+                [Result "1-0"]
+
+                1. e4 e5 1-0
+                """.formatted(Character.toString(0x2028));
+
+        importing(separator)
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("NOT_PGN"));
+    }
 }
