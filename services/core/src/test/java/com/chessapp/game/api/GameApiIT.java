@@ -255,4 +255,48 @@ class GameApiIT {
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.code").value("NOT_PGN"));
     }
+
+    /**
+     * The assertion that spring.mvc.problemdetails.enabled took effect. Without it
+     * this body is the legacy {"timestamp","error","path"} shape, and a client
+     * written against problem+json would mis-handle it.
+     */
+    @Test
+    void answersBadRequestInProblemJsonForABodyThatIsNotJson() throws Exception {
+        mockMvc.perform(post("/api/games")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"pgn\": "))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
+    void answersBadRequestForAnEmptyBody() throws Exception {
+        mockMvc.perform(post("/api/games")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(""))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+    }
+
+    /**
+     * One code unit past the cap. This bounds the work the parser can be asked to
+     * do; it does not bound bytes received, because Jackson has already
+     * deserialised the body by the time validation runs.
+     */
+    @Test
+    void answersBadRequestForADocumentPastTheSizeCap() throws Exception {
+        importing("x".repeat(1_048_577))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+    }
+
+    @Test
+    void answersUnsupportedMediaTypeForANonJsonContentType() throws Exception {
+        mockMvc.perform(post("/api/games")
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content(pgn("Unsupported White", "Unsupported Black")))
+                .andExpect(status().isUnsupportedMediaType());
+    }
 }
