@@ -1,9 +1,9 @@
 package com.chessapp.game.api;
 
-import static org.hamcrest.Matchers.startsWith;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -19,6 +19,7 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -76,9 +77,8 @@ class GameApiIT {
 
     @Test
     void answersCreatedWithTheStoredGame() throws Exception {
-        importing(pgn("Api White", "Api Black"))
+        MvcResult result = importing(pgn("Api White", "Api Black"))
                 .andExpect(status().isCreated())
-                .andExpect(header().string("Location", startsWith("/api/games/")))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.id").isNotEmpty())
                 .andExpect(jsonPath("$.white.name").value("Api White"))
@@ -93,7 +93,13 @@ class GameApiIT {
                 .andExpect(jsonPath("$.result").value("WHITE_WON"))
                 .andExpect(jsonPath("$.eco").value("C60"))
                 .andExpect(jsonPath("$.source").value("PGN_IMPORT"))
-                .andExpect(jsonPath("$.movetext").value("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6"));
+                .andExpect(jsonPath("$.movetext").value("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6"))
+                .andReturn();
+
+        String id = objectMapper.readTree(result.getResponse().getContentAsString())
+                .get("id").asString();
+
+        assertThat(result.getResponse().getHeader("Location")).isEqualTo("/api/games/" + id);
     }
 
     /**
@@ -106,7 +112,7 @@ class GameApiIT {
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
 
-        UUID id = UUID.fromString(objectMapper.readTree(body).get("id").asText());
+        UUID id = UUID.fromString(objectMapper.readTree(body).get("id").asString());
 
         assertThat(games.findById(id)).isPresent();
     }
@@ -122,6 +128,35 @@ class GameApiIT {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.sourcePgn").doesNotExist())
                 .andExpect(jsonPath("$.pgn").doesNotExist());
+    }
+
+    /**
+     * {@code doesNotExist()} passes whether a field is null or entirely absent, so
+     * it cannot tell "present as null" from "omitted" apart — it would stay green
+     * even if {@code GameResponse} grew {@code @JsonInclude(NON_NULL)}, or the
+     * application ever set {@code spring.jackson.default-property-inclusion:
+     * non_null} for an unrelated reason. Either change would silently drop
+     * {@code site}, {@code eco}, {@code round}, {@code playedOn} and both ratings
+     * from every response, contradicting the documented contract that "a client
+     * sees one shape whatever the document said." {@code nullValue()} is the
+     * matcher that actually distinguishes the two: it fails on an absent path and
+     * passes only when the path is present and null.
+     */
+    @Test
+    void answersOptionalMetadataAsNullRatherThanOmittingIt() throws Exception {
+        String noOptionalTags = """
+                [White "Null Shape White"]
+                [Black "Null Shape Black"]
+                [Result "1-0"]
+
+                1. e4 e5 1-0
+                """;
+
+        importing(noOptionalTags)
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.site").value(nullValue()))
+                .andExpect(jsonPath("$.eco").value(nullValue()))
+                .andExpect(jsonPath("$.round").value(nullValue()));
     }
 
     /**
@@ -292,11 +327,32 @@ class GameApiIT {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
     }
 
+    /**
+     * Exactly at the cap, not past it. {@code @Size(max = 1_048_576)} must accept
+     * this length rather than rejecting it as an off-by-one would; a megabyte of
+     * "x" is still not a PGN document, so the request reaches the parser and comes
+     * back 422 {@code NOT_PGN} rather than 400.
+     */
+    @Test
+    void acceptsADocumentExactlyAtTheSizeCap() throws Exception {
+        importing("x".repeat(1_048_576))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("NOT_PGN"));
+    }
+
     @Test
     void answersUnsupportedMediaTypeForANonJsonContentType() throws Exception {
         mockMvc.perform(post("/api/games")
                         .contentType(MediaType.TEXT_PLAIN)
                         .content(pgn("Unsupported White", "Unsupported Black")))
-                .andExpect(status().isUnsupportedMediaType());
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+    }
+
+    @Test
+    void answersMethodNotAllowedForAnUnsupportedMethod() throws Exception {
+        mockMvc.perform(put("/api/games"))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
     }
 }
