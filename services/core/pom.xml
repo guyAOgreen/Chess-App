@@ -21,6 +21,41 @@
         <java.version>25</java.version>
     </properties>
 
+    <!--
+      chesslib is published through JitPack rather than Maven Central. ADR 0001
+      accepted that, on the conditions that the version is pinned exactly and CI
+      caches the Maven repository so builds do not hit JitPack every run.
+    -->
+    <repositories>
+        <!--
+          Central is declared explicitly, and first. Maven searches repositories in
+          declaration order and appends the inherited central last, so without this
+          every ordinary artifact would probe JitPack and take a 404 before reaching
+          the repository that actually has it — slowing any build with a cold local
+          repository and making it needlessly sensitive to JitPack being reachable.
+        -->
+        <repository>
+            <id>central</id>
+            <url>https://repo.maven.apache.org/maven2</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -37,6 +72,17 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!--
+          Chess rules: legal move generation, SAN parsing and PGN reading.
+          Pinned exactly, never a branch reference or -SNAPSHOT.
+          Confined to com.chessapp.chess.chesslib by ADR 0001.
+        -->
+        <dependency>
+            <groupId>com.github.bhlangonijr</groupId>
+            <artifactId>chesslib</artifactId>
+            <version>1.3.7</version>
         </dependency>
 
         <!--

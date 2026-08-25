@@ -8,6 +8,14 @@ import org.junit.jupiter.api.Test;
 
 class GameSideTest {
 
+    /**
+     * Written numerically because both characters are invisible in source. Java's
+     * \R treats them as line terminators, as do many PGN readers, so a name
+     * carrying one would be emitted as a tag value spread over two lines.
+     */
+    private static final String LINE_SEPARATOR = Character.toString(0x2028);
+    private static final String PARAGRAPH_SEPARATOR = Character.toString(0x2029);
+
     private static final UUID PLAYER_ID = UUID.fromString("019535d9-3df7-79fb-b466-fa907fa17f9e");
 
     @Test
@@ -53,5 +61,34 @@ class GameSideTest {
         assertThatThrownBy(() -> new GameSide(PLAYER_ID, "Green, Guy", 0))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("rating");
+    }
+
+    @Test
+    void rejectsANameContainingALineBreakBecauseItWouldBreakPgnAssembly() {
+        assertThatThrownBy(() -> new GameSide(PLAYER_ID, "Green,\nGuy", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("control character");
+    }
+
+    @Test
+    void rejectsANameContainingAUnicodeLineSeparatorEvenThoughItIsNotAnIsoControl() {
+        assertThatThrownBy(() -> new GameSide(PLAYER_ID, "Green," + LINE_SEPARATOR + "Guy", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("control character");
+    }
+
+    @Test
+    void rejectsANameContainingAUnicodeParagraphSeparator() {
+        assertThatThrownBy(() ->
+                new GameSide(PLAYER_ID, "Green," + PARAGRAPH_SEPARATOR + "Guy", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("control character");
+    }
+
+    @Test
+    void rejectsANameContainingATab() {
+        assertThatThrownBy(() -> new GameSide(PLAYER_ID, "Green,\tGuy", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("control character");
     }
 }

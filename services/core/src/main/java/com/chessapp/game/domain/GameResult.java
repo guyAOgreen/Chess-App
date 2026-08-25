@@ -23,4 +23,22 @@ public enum GameResult {
     public String pgnToken() {
         return pgnToken;
     }
+
+    /**
+     * The result a PGN token denotes, or null when the token is not one of the four
+     * the specification defines. A document carrying anything else is treated as
+     * having said nothing, rather than as having said something wrong.
+     */
+    public static GameResult fromPgnToken(String token) {
+        if (token == null) {
+            return null;
+        }
+        String trimmed = token.trim();
+        for (GameResult result : values()) {
+            if (result.pgnToken().equals(trimmed)) {
+                return result;
+            }
+        }
+        return null;
+    }
 }

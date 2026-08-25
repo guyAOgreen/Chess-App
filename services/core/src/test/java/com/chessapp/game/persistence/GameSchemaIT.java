@@ -31,6 +31,10 @@ class GameSchemaIT {
     @ServiceConnection
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18");
 
+    /** Written numerically because both characters are invisible in source. */
+    private static final String LINE_SEPARATOR = Character.toString(0x2028);
+    private static final String PARAGRAPH_SEPARATOR = Character.toString(0x2029);
+
     @Autowired
     private DataSource dataSource;
 
@@ -236,5 +240,54 @@ class GameSchemaIT {
     void rejectsThePgnUnknownMarkerAsAnOptionalTagBecauseUnknownIsNull() {
         assertThatThrownBy(() -> insertWith("site", "?"))
                 .hasMessageContaining("games_site");
+    }
+
+    @Test
+    void rejectsAGameTimeNameContainingALineBreak() {
+        assertThatThrownBy(() -> insertWith("white_name", "Green,\nGuy"))
+                .hasMessageContaining("games_white_name_no_control");
+    }
+
+    @Test
+    void rejectsAnOptionalTagContainingALineBreak() {
+        assertThatThrownBy(() -> insertWith("event", "Club\nChampionship"))
+                .hasMessageContaining("games_event_no_control");
+    }
+
+    /**
+     * PostgreSQL's [[:cntrl:]] does not match U+2028 or U+2029 — confirmed by
+     * running it on PostgreSQL 18 — so the V3 constraints let both through. Java's
+     * \R treats them as line terminators, as do many PGN readers, so a value
+     * carrying one is emitted as a tag spread over two lines that cannot be read
+     * back. The domain rejects them, and V4 makes the database agree.
+     */
+    @Test
+    void rejectsAGameTimeNameContainingAUnicodeLineSeparator() {
+        assertThatThrownBy(() -> insertWith("white_name", "Green," + LINE_SEPARATOR + "Guy"))
+                .hasMessageContaining("games_white_name_no_line_separator");
+    }
+
+    @Test
+    void rejectsAGameTimeNameContainingAUnicodeParagraphSeparator() {
+        assertThatThrownBy(() -> insertWith("black_name", "Club" + PARAGRAPH_SEPARATOR + "Opponent"))
+                .hasMessageContaining("games_black_name_no_line_separator");
+    }
+
+    @Test
+    void rejectsAnEventContainingAUnicodeLineSeparator() {
+        assertThatThrownBy(() -> insertWith("event", "Club" + LINE_SEPARATOR + "Championship"))
+                .hasMessageContaining("games_event_no_line_separator");
+    }
+
+    @Test
+    void rejectsASiteContainingAUnicodeParagraphSeparator() {
+        assertThatThrownBy(() -> insertWith("site", "London" + PARAGRAPH_SEPARATOR + "ENG"))
+                .hasMessageContaining("games_site_no_line_separator");
+    }
+
+    @Test
+    void rejectsARoundContainingAUnicodeLineSeparator() {
+        assertThatThrownBy(() -> insertWith("round", "3" + LINE_SEPARATOR + "2"))
+                .hasMessageContaining("games_round_no_line_separator");
     }
 }
