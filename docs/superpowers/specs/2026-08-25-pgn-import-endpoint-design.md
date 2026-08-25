@@ -314,15 +314,23 @@ satisfies `GameValues`. It does:
   and no terminal result token.
 
 The one apparent gap is U+2028 and U+2029, which `GameValues` rejects and
-`PgnTagValues` does not. It is not reachable: `PgnTagReader` splits the document on
-`\R`, which matches both characters, so a tag value containing one is spread over
-two lines and never matches the tag pattern. Such a tag is simply absent —
-`Event` becomes null, and `White` becomes `PLAYER_UNKNOWN`.
+`PgnTagValues` does not. It is not reachable, though not for the reason the tag
+readers alone suggest. `PgnTagReader` splits the document on `\R`, which matches
+both characters, so a tag value carrying one is spread over two lines and matches
+the tag pattern on neither. But `PgnTagReader.movetext` keeps every line that is
+not a tag pair, so the two orphaned fragments land in the movetext section, and
+chesslib fails on them.
+
+Verified empirically against `ChesslibPgnParser`: a separator in `Event` and a
+separator in `White` are both rejected as `NOT_PGN` with "the text could not be
+read as PGN". The document never reaches `ParsedGame`, so nothing carrying a
+separator can reach domain construction.
 
 An `IllegalArgumentException` escaping `ImportPgn` therefore indicates a defect in
-this reasoning rather than bad input, and 500 is the correct answer for it. A test
-asserts the U+2028 case specifically, so the conclusion is checked rather than
-merely argued.
+this reasoning rather than bad input, and 500 is the correct answer for it. The
+U+2028 case is asserted as a test, so the conclusion is checked rather than merely
+argued — and it is worth checking, because the first version of this analysis had
+the mechanism wrong while reaching the right conclusion.
 
 ## Orchestration
 
@@ -401,8 +409,9 @@ JSON serialisation, real error handling and the real database.
   actually took effect;
 * an empty request body returns 400 in problem+json;
 * a `pgn` over the cap returns 400;
-* a document whose `Event` tag contains U+2028 imports successfully with a null
-  event, rather than failing — the check on the analysis above.
+* a document whose `Event` tag contains U+2028 returns 422 `NOT_PGN` rather than
+  500 — the check on the analysis above. The assertion is that it does not reach
+  domain construction, not that it imports.
 
 ### `ImportPgnIT`
 
