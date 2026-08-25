@@ -1,6 +1,13 @@
 spring:
   application:
     name: chess-app-core
+  mvc:
+    problemdetails:
+      # RFC 9457 problem details, which default to OFF in Boot 4.1. Without this,
+      # Spring's own errors — malformed JSON, wrong method, wrong content type —
+      # return the legacy {"timestamp","error","path"} body while our rejections
+      # return problem+json. Two error shapes on one API is worse than either.
+      enabled: true
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/chessapp}
     username: ${SPRING_DATASOURCE_USERNAME:chessapp}
