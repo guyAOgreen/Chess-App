@@ -149,15 +149,26 @@ merging a `Player` must not rewrite historical exports. Taking it from the resol
 player would make the two coincide by accident and would silently start rewriting
 history the day aliasing (#21) makes matching non-exact.
 
-### 9. A size cap on the submitted document
+### 9. An application-level size cap on the submitted document
 
-`pgn` is capped at 1 MB with `@Size`, producing a 400.
+`pgn` is capped at 1,048,576 UTF-16 code units with `@Size`, producing a 400.
+This is a character-count limit, not a byte limit: Bean Validation measures the
+deserialised `String`, and Java strings are UTF-16. Calling it a 1 MB limit would
+therefore promise something the implementation does not enforce.
 
-This endpoint is unauthenticated until #25, and Spring places no limit on a JSON
-request body — `maxHttpFormPostSize` applies to form data, not to
-`application/json`. A heavily annotated 200-move game is tens of kilobytes, so 1 MB
-is generous by more than an order of magnitude while still bounding the work the
-parser can be asked to do.
+This endpoint is unauthenticated until #25, and Spring Boot offers no property
+that limits a JSON request body: `server.tomcat.max-http-form-post-size` applies
+to form content only, and the generic `server.max-http-post-size` has been
+deprecated at error level since 3.0. A heavily annotated 200-move game is tens of
+kilobytes, so the cap is generous by more than an order of magnitude while still
+bounding the work the parser can be asked to do.
+
+`@Size` is deliberately described as an application-level limit. Jackson must
+read and deserialise the request before validation runs, so this does **not** cap
+bytes received over the network or protect the server from an arbitrarily large
+HTTP body. A transport-level request limit belongs in deployment infrastructure
+or a deliberately tested servlet filter. That broader denial-of-service control
+is required before public deployment, but is not introduced by this endpoint.
 
 This is beyond the issue text, and is included because it is a property of the
 endpoint rather than a feature: adding it later means changing a published
@@ -180,15 +191,21 @@ literal per controller is cheaper than indirection every newcomer has to discove
 
 ### 11. The response carries no assembled PGN
 
-`GameResponse` returns canonical `movetext` and the metadata columns, not the
-document `CanonicalPgn.from(Game)` would assemble.
+`GameResponse` returns canonical `movetext` and the public game metadata, not the
+document `CanonicalPgn.from(Game)` would assemble and not `sourcePgn`.
 
 The game viewer (#11) re-parses movetext to drive the board — the #6 spec records
 that as the plan — so shipping the assembled document as well would send the same
 moves twice in every response, including every row of the #8 list if that reuses
 the type. Export as a PGN file is a real requirement, but it is a distinct
 representation of an existing resource and belongs behind a content negotiation or
-a `/games/{id}.pgn` route, decided when something needs it.
+an `/api/games/{id}.pgn` route, decided when something needs it.
+
+`sourcePgn` is provenance, not part of the resource representation. Returning it
+would duplicate the moves, expose comments or other submitted data that the
+canonical model does not use, and couple later read endpoints to an audit field.
+It remains available internally for traceability. A future explicit source or
+export use case can decide its own authorisation and representation.
 
 ## Package layout
 
@@ -265,8 +282,9 @@ than omitted, so a client sees one shape whatever the document said.
 | --- | --- | --- |
 | Any `PgnErrorCode` | 422 | the code |
 | `pgn` absent or null | 422 | `NOT_PGN` |
-| `pgn` over 1 MB | 400 | — |
+| `pgn` over the size cap | 400 | — |
 | Body not readable as JSON | 400 | — |
+| Empty request body | 400 | — |
 | Wrong method | 405 | — |
 | Wrong content type | 415 | — |
 | Domain construction fails | 500 | — |
@@ -328,7 +346,7 @@ ImportPgn.execute(String pgn)
              │        game.result(), game.eco(),
              │        GameSource.PGN_IMPORT,
              │        game.movetext(),
-             │        pgn))                          ◄── the request string, verbatim
+             │        pgn))                  ◄── the deserialised PGN string unchanged
              │
              └──────────────────────────► PgnImportResult.Imported(game)
 ```
@@ -336,7 +354,10 @@ ImportPgn.execute(String pgn)
 Parsing comes first so an invalid document never reaches the database, and so the
 common failure costs no connection.
 
-`sourcePgn` is the submitted string exactly as received, byte order mark included.
+`sourcePgn` is the deserialised `pgn` value character-for-character, byte order
+mark included. It is not the original HTTP byte sequence: JSON escapes and the
+request character encoding have already been decoded before the controller sees
+the value.
 ADR 0002 makes it provenance that nothing reads to answer a product question, and
 normalising it would defeat the point of keeping it.
 
@@ -378,6 +399,7 @@ JSON serialisation, real error handling and the real database.
 * `{}` returns 422 `NOT_PGN`;
 * a malformed body returns 400 in problem+json — the assertion that decision 3
   actually took effect;
+* an empty request body returns 400 in problem+json;
 * a `pgn` over the cap returns 400;
 * a document whose `Event` tag contains U+2028 imports successfully with a null
   event, rather than failing — the check on the analysis above.
@@ -386,7 +408,8 @@ JSON serialisation, real error handling and the real database.
 
 Orchestration directly, without HTTP:
 
-* `sourcePgn` is stored byte-for-byte as submitted, including a byte order mark;
+* `sourcePgn` equals the deserialised `pgn` value character-for-character,
+  including a byte order mark;
 * `movetext` is the canonical form, not the submitted text;
 * `source` is `PGN_IMPORT`;
 * a rejected document leaves `games` and `players` untouched;
@@ -406,10 +429,11 @@ details convention. Getting the representation wrong is cheap to fix now and
 expensive after #10 and #11 consume it. This is why the response shape is treated
 as a decision in its own right rather than as an implementation detail.
 
-**No authentication.** Any caller can create games until #25. The size cap bounds
-the damage a single request can do; it does not bound the number of requests. This
-is accepted for local development and must not reach a deployed environment ahead
-of #25.
+**No authentication.** Any caller can create games until #25. The character cap
+bounds parser work after deserialisation; it neither limits bytes received nor the
+number of requests. This is accepted for local development and must not reach a
+publicly reachable environment ahead of authentication and transport-level request
+limits.
 
 ## Known limitations
 
@@ -422,9 +446,18 @@ It gets its own issue rather than riding along on the first endpoint.
 **No delete.** A game imported by mistake cannot be removed through the API. With
 duplicates possible, this will be wanted early.
 
+**No transport-level request limit.** Decision 9 caps the deserialised `pgn`
+value, which bounds parser work but not the bytes read off the wire: Bean
+Validation runs after Jackson. Spring Boot offers no property that would close
+this — `server.max-http-post-size` has been deprecated at error level since 3.0,
+and `server.tomcat.max-http-form-post-size` applies to form content only — so it
+needs a reverse proxy limit or a servlet filter. Tracked as a deployment
+prerequisite alongside #25 rather than left to be rediscovered.
+
 ## Out of scope
 
-* **`GET /games` and `GET /games/{id}`** — #8 and #9, which reuse `GameResponse`.
+* **`GET /api/games` and `GET /api/games/{id}`** — #8 and #9, which reuse
+  `GameResponse`.
 * **OpenAPI and generated frontend types** — #27.
 * **Authentication and ownership** — #25. Games have no owner column yet.
 * **PGN export** — a distinct representation, decided when something needs it.
