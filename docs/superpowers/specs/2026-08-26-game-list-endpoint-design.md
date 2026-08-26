@@ -76,8 +76,8 @@ makes adding it safe exists from the first commit — which is what #21 inherits
 ### 3. A list row is a projection, not a whole game
 
 `GameResponse`'s javadoc left this open for this issue. The answer is a separate
-`GameSummary` in the domain and `GameSummaryResponse` in the API, carrying every
-public field of a game **except** `movetext`.
+`GameSummary` in the domain and `GameSummaryResponse` in the API, carrying the
+public list metadata but neither `movetext` nor the provenance-only `sourcePgn`.
 
 A page of 25 games would otherwise ship 25 complete move lists to render a table
 that displays none of them. That is the visible half. The invisible half is that
@@ -223,24 +223,46 @@ reason — `Repository<>` rather than `JpaRepository`, a native insert rather th
 `save()`.
 
 The count query is the one real cost, because a rows query and a count query that
-disagree are a silent wrong answer. Predicates are therefore built once, by a method
-taking `(CriteriaBuilder, Root<GameEntity>)`, and called from both.
+disagree are a silent wrong answer. Predicate construction is therefore defined
+once, by a method taking `(CriteriaBuilder, Root<GameEntity>)`, and invoked for
+both query roots.
 
 ### 9. No application-layer class on the read path
 
-`GameController` builds a `GameQuery` from the bound parameters and maps the
-resulting `GamePage` to a `GamePageResponse`. Both are DTO conversion, which
-`CLAUDE.md` assigns to the API layer. There is no orchestration, no transaction to
-own and no interaction between domain objects to coordinate.
+`GameController` binds and validates `GameListParams`, converts them to a
+`GameQuery`, and maps the resulting `GamePage` to a `GamePageResponse`. Both
+conversions are DTO work, which `CLAUDE.md` assigns to the API layer. There is no
+orchestration, no transaction to own and no interaction between domain objects to
+coordinate.
 
 A `ListGames` whose `execute` is a single delegating line would be a home for
 nothing, which is the reasoning #7 used to decline a `shared` package. The class
 arrives with #21, when resolving a player name to a `Player` before building the
 query gives it work to do.
 
-The controller consequently depends on `GameRepository` directly. That is a
-read-side shortcut, taken knowingly, and it is the thing to revisit first if this
-path acquires any behaviour at all.
+The controller consequently depends on `GameRepository` directly. That is worth
+being precise about, because the obvious objection is the wrong one: `GameRepository`
+is declared in `com.chessapp.game.domain` and its javadoc records that the
+dependency points inward, so this is the API layer depending on a **domain** port,
+not on persistence. What it does skip is the application layer, which every other
+flow passes through.
+
+That inconsistency is accepted rather than argued away, and it is worth revisiting
+as a question in its own right — whether read paths in this codebase should have
+application-layer use cases on principle, or only when they have something to
+orchestrate. That decision governs #9, #21 and every later read endpoint, so it
+belongs in an issue of its own rather than being settled as a side effect of the
+first list endpoint. It is the first thing to change if this path acquires any
+behaviour at all.
+
+**The transaction boundary is the adapter's, as it is for every other read.**
+`GameRepositoryAdapter.find` is `@Transactional(readOnly = true)`, matching
+`findById` immediately above it and `PlayerRepositoryAdapter`. It is there for one
+connection checkout instead of two and to keep Hibernate from dirty-checking, and
+explicitly **not** for snapshot consistency: under PostgreSQL's default
+`READ COMMITTED` isolation each statement takes its own snapshot, so wrapping the
+rows and count queries in one read-only transaction does not make them agree. See
+"Known limitations".
 
 ### 10. Our own page envelope, not a serialised `PageImpl`
 
@@ -257,8 +279,10 @@ minimum: content, page, size and total.
 
 Query parameters bind into one `@Valid` record, `GameListParams`, by constructor
 binding. Single-field rules are annotations — `@Min(0)` on `page`, `@Min(1)` and
-`@Max(100)` on `size`. The two cross-field rules are `@AssertTrue` methods on the
-same record:
+`@Max(100)` on `size`, and `@Size(max = 255)` on `event`. A supplied event is
+trimmed; an empty result is treated as omitted, so `?event=` has the same meaning
+as no event filter rather than accidentally matching every non-null event. The two
+cross-field rules are `@AssertTrue` methods on the same record:
 
 * `colour` requires `playerId`. A colour on its own has nothing to constrain, and a
   filter that silently does nothing is worse than one that is refused.
@@ -306,7 +330,7 @@ com.chessapp.game
 └── persistence/
     ├── GameSearchQuery.java       Criteria: predicates, ordering, count
     ├── LikePattern.java           LIKE metacharacter escaping (package-private)
-    └── GameRepositoryAdapter.java + find(query)
+    └── GameRepositoryAdapter.java + find(query), @Transactional(readOnly = true)
 ```
 
 `GameSummaryResponse` reuses `GameResponse.Side` rather than redeclaring an
@@ -342,7 +366,7 @@ GET /api/games?playerId=0199f3c1-…&colour=WHITE&result=DRAW
 | `result` | `GameResult` | — | `WHITE_WON`, `BLACK_WON`, `DRAW`, `UNFINISHED` |
 | `from` | ISO date | — | inclusive; excludes undated games |
 | `to` | ISO date | — | inclusive; excludes undated games |
-| `event` | string | — | case-insensitive substring |
+| `event` | string (max 255 characters) | — | trimmed, case-insensitive substring; blank means omitted |
 
 Every filter supplied is combined with `AND`. Every filter omitted constrains
 nothing.
@@ -390,6 +414,7 @@ the same: empty `content`, with `totalElements` still reporting the filtered tot
 | Unknown `sort`, `direction`, `colour` or `result` value | 400 |
 | Malformed `playerId`, `from` or `to` | 400 |
 | `size` outside 1–100, `page` outside 0–100 000 | 400 |
+| `event` longer than 255 characters | 400 |
 | `colour` without `playerId` | 400 |
 | `from` after `to` | 400 |
 | Domain construction fails | 500 |
@@ -425,7 +450,10 @@ GameSearchQuery.run(GameQuery)
                               ──► GamePage(content, page, size, totalElements)
 ```
 
-Predicates are built once and used by both queries, so they cannot drift.
+Predicate construction is defined once and invoked for each query root. Criteria
+`Predicate` instances themselves cannot be shared between the rows and count
+queries, but both receive their structure from the same helper so their filtering
+logic cannot drift.
 
 | Filter | Predicate |
 | --- | --- |
@@ -467,6 +495,14 @@ Domain validation, without Spring:
 * a null `sort` or `direction` is rejected rather than defaulted — defaults belong
   to `GameListParams`;
 * a query with no filters at all is valid.
+
+### `GameListParamsTest`
+
+Boundary normalization and defaults, without a database:
+
+* surrounding whitespace is removed from `event`;
+* a blank `event` becomes null (no filter);
+* omitted paging and sorting values receive the documented defaults.
 
 ### `GameSearchIT`
 
@@ -515,6 +551,7 @@ own fixtures match** — its own player id, or a unique event string.
 * `colour=WHITE` without `playerId` returns 400;
 * `from` after `to` returns 400;
 * `size=500`, `size=0` and `page=-1` each return 400;
+* an `event` longer than 255 characters returns 400;
 * a malformed `playerId` returns 400;
 * an unknown `result` value returns 400;
 * a filter matching nothing returns 200 with empty content and `totalElements: 0`.
@@ -571,6 +608,13 @@ the fix, and decision 1 records why it is not worth its cost yet.
 first thing to make optional — a `count=false` parameter, or an estimate — if a
 reference-game dataset ever arrives behind this endpoint.
 
+**Rows and count do not share a database snapshot.** PostgreSQL's default
+`READ COMMITTED` isolation gives each statement its own snapshot, so a concurrent
+insert or delete can make `content` and `totalElements` momentarily disagree. This
+is acceptable for the same small, low-write dataset that justifies offset paging.
+If it becomes observable, run both reads in a repeatable-read, read-only
+transaction or change the pagination contract.
+
 **An ascending sort cannot use the index.** Decision 6, accepted deliberately. It
 becomes a real cost only at a row count this endpoint is not built for.
 
@@ -589,6 +633,9 @@ database.
 * **Player search and name-based filtering** —
   [#21](https://github.com/guyAOgreen/Chess-App/issues/21), which also introduces the
   `ListGames` application class decision 9 defers.
+* **Whether read paths need application-layer use cases on principle** — decision 9
+  accepts the inconsistency for this endpoint and records why. Settling it for #9,
+  #21 and every later read endpoint needs its own issue.
 * **Sorting by anything but `played_on`** — one enum constant when a UI asks.
 * **Filtering by `source`, `site`, `round`, `eco` or rating** — not in the issue, and
   each is one predicate when something needs it.
