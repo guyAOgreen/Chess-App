@@ -247,13 +247,15 @@ dependency points inward, so this is the API layer depending on a **domain** por
 not on persistence. What it does skip is the application layer, which every other
 flow passes through.
 
-That inconsistency is accepted rather than argued away, and it is worth revisiting
-as a question in its own right — whether read paths in this codebase should have
-application-layer use cases on principle, or only when they have something to
-orchestrate. That decision governs #9, #21 and every later read endpoint, so it
-belongs in an issue of its own rather than being settled as a side effect of the
-first list endpoint. It is the first thing to change if this path acquires any
-behaviour at all.
+That inconsistency is accepted rather than argued away, and it is raised as a
+question in its own right by
+[#41](https://github.com/guyAOgreen/Chess-App/issues/41): whether read paths in this
+codebase should have application-layer use cases on principle, or only when they
+have something to orchestrate. That decision governs #9, #21 and every later read
+endpoint, so it is settled there rather than as a side effect of the first list
+endpoint. If #41 lands on uniform layering, this controller is brought into line
+with it. It is also the first thing to change if this path acquires any behaviour at
+all.
 
 **The transaction boundary is the adapter's, as it is for every other read.**
 `GameRepositoryAdapter.find` is `@Transactional(readOnly = true)`, matching
@@ -633,9 +635,10 @@ database.
 * **Player search and name-based filtering** —
   [#21](https://github.com/guyAOgreen/Chess-App/issues/21), which also introduces the
   `ListGames` application class decision 9 defers.
-* **Whether read paths need application-layer use cases on principle** — decision 9
-  accepts the inconsistency for this endpoint and records why. Settling it for #9,
-  #21 and every later read endpoint needs its own issue.
+* **Whether read paths need application-layer use cases on principle** —
+  [#41](https://github.com/guyAOgreen/Chess-App/issues/41). Decision 9 accepts the
+  inconsistency for this endpoint and records why; settling it for #9, #21 and every
+  later read endpoint happens there.
 * **Sorting by anything but `played_on`** — one enum constant when a UI asks.
 * **Filtering by `source`, `site`, `round`, `eco` or rating** — not in the issue, and
   each is one predicate when something needs it.
