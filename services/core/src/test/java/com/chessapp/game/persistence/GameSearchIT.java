@@ -299,19 +299,38 @@ class GameSearchIT {
         assertThat(page.page()).isEqualTo(9);
     }
 
+    /**
+     * The multiselect column order and toSummary's positional Tuple indices are
+     * aligned by hand across fourteen slots, with nothing at compile time linking
+     * them: every same-typed pair is transposable in silence. So every projected
+     * column gets a distinct non-null value here, and every one is asserted — a
+     * fixture that nulls a column, or two columns sharing a value, would let a
+     * transposition through.
+     */
     @Test
     void returnsEveryProjectedFieldOfARow() {
-        store(subject, opponent, LocalDate.of(2026, 3, 14), GameResult.WHITE_WON, "Obs Club");
+        games.save(new NewGame(
+                new GameSide(subject, "White Snapshot", 1850),
+                new GameSide(opponent, "Black Snapshot", 1720),
+                "Obs Club Championship", "London ENG", "3.2",
+                LocalDate.of(2026, 3, 14), GameResult.WHITE_WON, "C60", GameSource.PGN_IMPORT,
+                "1. e4 e5", null));
 
         GameSummary row = games.find(all()).content().getFirst();
 
         assertThat(row.id()).isNotNull();
         assertThat(row.white().playerId()).isEqualTo(subject);
-        assertThat(row.white().name()).isEqualTo("White " + subject);
+        assertThat(row.white().name()).isEqualTo("White Snapshot");
+        assertThat(row.white().rating()).isEqualTo(1850);
         assertThat(row.black().playerId()).isEqualTo(opponent);
-        assertThat(row.event()).isEqualTo("Obs Club");
+        assertThat(row.black().name()).isEqualTo("Black Snapshot");
+        assertThat(row.black().rating()).isEqualTo(1720);
+        assertThat(row.event()).isEqualTo("Obs Club Championship");
+        assertThat(row.site()).isEqualTo("London ENG");
+        assertThat(row.round()).isEqualTo("3.2");
         assertThat(row.playedOn()).isEqualTo(LocalDate.of(2026, 3, 14));
         assertThat(row.result()).isEqualTo(GameResult.WHITE_WON);
+        assertThat(row.eco()).isEqualTo("C60");
         assertThat(row.source()).isEqualTo(GameSource.PGN_IMPORT);
     }
 }

@@ -17,6 +17,7 @@ import jakarta.persistence.criteria.Order;
 import jakarta.persistence.criteria.Path;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Selection;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -67,12 +68,12 @@ class GameSearchQuery {
         CriteriaQuery<Tuple> criteria = builder.createTupleQuery();
         Root<GameEntity> game = criteria.from(GameEntity.class);
 
-        criteria.multiselect(game.get("id"),
+        criteria.multiselect(List.<Selection<?>>of(game.get("id"),
                         game.get("whitePlayerId"), game.get("whiteName"), game.get("whiteRating"),
                         game.get("blackPlayerId"), game.get("blackName"), game.get("blackRating"),
                         game.get("event"), game.get("site"), game.get("round"),
                         game.get("playedOn"), game.get("result"), game.get("eco"),
-                        game.get("source"))
+                        game.get("source")))
                 .where(filters(builder, game, query))
                 .orderBy(ordering(builder, game, query));
 

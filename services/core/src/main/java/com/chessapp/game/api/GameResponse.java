@@ -10,10 +10,10 @@ import java.util.UUID;
 /**
  * The game detail representation. #9 returns this same shape for a single game.
  *
- * <p>Whether #8's list endpoint reuses this type for each row is not yet decided:
- * {@code GameResponse} carries the full {@code movetext}, so a list of many games
- * would ship every game's complete move list. #8 should decide whether list rows
- * need a slimmer projection rather than treating reuse of this type as settled.
+ * <p>The detail representation only. The list endpoint returns
+ * {@link GameSummaryResponse}, which is this shape without {@code movetext}: a page
+ * of games would otherwise ship every game's complete move list to render a table
+ * that displays none of them.
  *
  * <p>Built from the domain {@link Game}, so {@code GameEntity} never leaves
  * persistence.

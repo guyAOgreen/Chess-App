@@ -371,10 +371,14 @@ class GameApiIT {
      * is being asserted, because none of them is supplied.
      */
     private static String pgnWithEvent(String white, String black, String event) {
+        return pgnWithEvent(white, black, event, "2026.03.14");
+    }
+
+    private static String pgnWithEvent(String white, String black, String event, String date) {
         return """
                 [Event "%s"]
                 [Site "London ENG"]
-                [Date "2026.03.14"]
+                [Date "%s"]
                 [Round "3.2"]
                 [White "%s"]
                 [Black "%s"]
@@ -383,7 +387,7 @@ class GameApiIT {
                 [ECO "C60"]
 
                 1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 1-0
-                """.formatted(event, white, black);
+                """.formatted(event, date, white, black);
     }
 
     private String importForListing(String event) throws Exception {
@@ -546,5 +550,59 @@ class GameApiIT {
     void rejectsAnEventTermBeyondTheLengthCap() throws Exception {
         mockMvc.perform(get("/api/games").param("event", "x".repeat(256)))
                 .andExpect(status().isBadRequest());
+    }
+
+    /**
+     * Every other parameter is proven to bind by a 400 that could not occur if it
+     * were silently ignored. direction had neither a positive nor a negative test,
+     * so renaming the record component would have pinned every list request to DESC
+     * with the whole suite still green. This asserts the order actually flips.
+     */
+    @Test
+    void bindsTheSortDirection() throws Exception {
+        String event = "Directional " + UUID.randomUUID();
+        importing(pgnWithEvent("Dir Early " + event, "Dir Early Black " + event, event,
+                "2026.01.05")).andExpect(status().isCreated());
+        importing(pgnWithEvent("Dir Late " + event, "Dir Late Black " + event, event,
+                "2026.09.20")).andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/games").param("event", event).param("direction", "DESC"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(jsonPath("$.content[0].playedOn").value("2026-09-20"))
+                .andExpect(jsonPath("$.content[1].playedOn").value("2026-01-05"));
+
+        mockMvc.perform(get("/api/games").param("event", event).param("direction", "ASC"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(jsonPath("$.content[0].playedOn").value("2026-01-05"))
+                .andExpect(jsonPath("$.content[1].playedOn").value("2026-09-20"));
+    }
+
+    @Test
+    void rejectsASortDirectionOutsideTheEnum() throws Exception {
+        mockMvc.perform(get("/api/games").param("direction", "SIDEWAYS"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+    }
+
+    /**
+     * The plainest request there is, and the only one that reaches the query with no
+     * predicates at all. The class shares a container with no cleanup, so this
+     * asserts only what is independent of what other tests created: the status, the
+     * envelope, and the documented defaults. Content is asserted by the scoped tests.
+     */
+    @Test
+    void answersAParameterlessRequestWithTheEnvelopeAndTheDefaults() throws Exception {
+        importForListing("Unscoped " + UUID.randomUUID());
+
+        mockMvc.perform(get("/api/games"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(25))
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.totalElements").isNumber())
+                .andExpect(jsonPath("$.totalPages").isNumber());
     }
 }
