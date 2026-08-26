@@ -487,10 +487,10 @@ class GameApiIT {
     }
 
     /**
-     * The unsatisfiable-range test above answers 400 whether the dates bound and
-     * tripped the cross-field rule or failed to bind at all, so on its own it would
-     * stay green against a date filter that never worked. This asserts the filter
-     * actually filters.
+     * The unsatisfiable-range test above proves the cross-field rule fires, but it
+     * cannot prove from and to reach the query at all — it would answer 400 just the
+     * same against a date filter that was never wired through. This asserts the
+     * filter actually filters.
      */
     @Test
     void filtersByDateRange() throws Exception {
