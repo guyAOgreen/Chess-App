@@ -1,6 +1,8 @@
 package com.chessapp.game.api;
 
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -354,5 +356,195 @@ class GameApiIT {
         mockMvc.perform(put("/api/games"))
                 .andExpect(status().isMethodNotAllowed())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+    }
+
+    /**
+     * The class shares one container with no cleanup between methods, so an
+     * unfiltered list request sees every game every other test ever created. Every
+     * list test therefore scopes itself with a filter only its own fixture matches:
+     * a unique event string, or the player id the import reported.
+     *
+     * <p>That is why the defaults are asserted on a scoped request rather than on a
+     * parameterless one, which the design describes. A parameterless request here
+     * would see every game the import tests created and its assertions would depend
+     * on execution order. The defaults themselves — page 0, size 25 — are still what
+     * is being asserted, because none of them is supplied.
+     */
+    private static String pgnWithEvent(String white, String black, String event) {
+        return """
+                [Event "%s"]
+                [Site "London ENG"]
+                [Date "2026.03.14"]
+                [Round "3.2"]
+                [White "%s"]
+                [Black "%s"]
+                [Result "1-0"]
+                [WhiteElo "1850"]
+                [ECO "C60"]
+
+                1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 1-0
+                """.formatted(event, white, black);
+    }
+
+    private String importForListing(String event) throws Exception {
+        return importing(pgnWithEvent("List White " + event, "List Black " + event, event))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+    }
+
+    @Test
+    void listsMatchingGamesWithTheDocumentedDefaults() throws Exception {
+        String event = "Listing " + UUID.randomUUID();
+        importForListing(event);
+
+        mockMvc.perform(get("/api/games").param("event", event))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(25))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1))
+                .andExpect(jsonPath("$.content[0].event").value(event))
+                .andExpect(jsonPath("$.content[0].white.name").value("List White " + event))
+                .andExpect(jsonPath("$.content[0].white.rating").value(1850))
+                .andExpect(jsonPath("$.content[0].black.rating").doesNotExist())
+                .andExpect(jsonPath("$.content[0].playedOn").value("2026-03-14"))
+                .andExpect(jsonPath("$.content[0].result").value("WHITE_WON"))
+                .andExpect(jsonPath("$.content[0].eco").value("C60"))
+                .andExpect(jsonPath("$.content[0].source").value("PGN_IMPORT"));
+    }
+
+    /**
+     * A page of 25 rows would otherwise carry 25 complete move lists to render a
+     * table that shows none of them.
+     */
+    @Test
+    void doesNotCarryTheMovesOnAListRow() throws Exception {
+        String event = "Moveless " + UUID.randomUUID();
+        importForListing(event);
+
+        mockMvc.perform(get("/api/games").param("event", event))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].movetext").doesNotExist())
+                .andExpect(jsonPath("$.content[0].sourcePgn").doesNotExist());
+    }
+
+    @Test
+    void filtersByPlayerAndColour() throws Exception {
+        String event = "Coloured " + UUID.randomUUID();
+        String body = importForListing(event);
+        String whitePlayerId = objectMapper.readTree(body).get("white").get("playerId").asString();
+
+        mockMvc.perform(get("/api/games")
+                        .param("playerId", whitePlayerId)
+                        .param("colour", "WHITE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].event").value(event));
+
+        mockMvc.perform(get("/api/games")
+                        .param("playerId", whitePlayerId)
+                        .param("colour", "BLACK"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(0)))
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    void answersAnEmptyPageWhenNothingMatches() throws Exception {
+        mockMvc.perform(get("/api/games").param("event", "Nothing " + UUID.randomUUID()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(0)))
+                .andExpect(jsonPath("$.totalElements").value(0))
+                .andExpect(jsonPath("$.totalPages").value(0));
+    }
+
+    /**
+     * The whole point of GameSort being an enum: an unknown sort field fails in
+     * conversion, before a query exists, rather than being concatenated into one.
+     */
+    @Test
+    void rejectsASortFieldOutsideTheWhitelist() throws Exception {
+        mockMvc.perform(get("/api/games").param("sort", "movetext"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+    }
+
+    @Test
+    void rejectsAColourWithNoPlayerToNarrow() throws Exception {
+        mockMvc.perform(get("/api/games").param("colour", "WHITE"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+    }
+
+    @Test
+    void rejectsAnUnsatisfiableDateRange() throws Exception {
+        mockMvc.perform(get("/api/games")
+                        .param("from", "2026-06-01")
+                        .param("to", "2026-01-01"))
+                .andExpect(status().isBadRequest());
+    }
+
+    /**
+     * The unsatisfiable-range test above answers 400 whether the dates bound and
+     * tripped the cross-field rule or failed to bind at all, so on its own it would
+     * stay green against a date filter that never worked. This asserts the filter
+     * actually filters.
+     */
+    @Test
+    void filtersByDateRange() throws Exception {
+        String event = "Dated " + UUID.randomUUID();
+        importForListing(event);
+
+        mockMvc.perform(get("/api/games")
+                        .param("event", event)
+                        .param("from", "2026-03-01")
+                        .param("to", "2026-03-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].playedOn").value("2026-03-14"));
+
+        mockMvc.perform(get("/api/games")
+                        .param("event", event)
+                        .param("from", "2026-04-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(0)));
+    }
+
+    @Test
+    void rejectsAPageSizeBeyondTheCap() throws Exception {
+        mockMvc.perform(get("/api/games").param("size", "500"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void rejectsAPageOfNoRows() throws Exception {
+        mockMvc.perform(get("/api/games").param("size", "0"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void rejectsANegativePage() throws Exception {
+        mockMvc.perform(get("/api/games").param("page", "-1"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void rejectsAMalformedPlayerIdentifier() throws Exception {
+        mockMvc.perform(get("/api/games").param("playerId", "not-a-uuid"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void rejectsAResultOutsideTheEnum() throws Exception {
+        mockMvc.perform(get("/api/games").param("result", "WHITE_LOST"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void rejectsAnEventTermBeyondTheLengthCap() throws Exception {
+        mockMvc.perform(get("/api/games").param("event", "x".repeat(256)))
+                .andExpect(status().isBadRequest());
     }
 }
