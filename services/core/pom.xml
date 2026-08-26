@@ -111,6 +111,17 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!--
+          Boot 4 splits MockMvc test support out of spring-boot-test-autoconfigure
+          the same way it split jackson and flyway autoconfiguration out of the
+          core starters: without this, @AutoConfigureMockMvc and MockMvc itself
+          are not on the test classpath at all.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-testcontainers</artifactId>
