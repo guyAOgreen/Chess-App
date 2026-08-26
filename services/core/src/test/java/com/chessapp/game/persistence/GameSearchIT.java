@@ -205,28 +205,46 @@ class GameSearchIT {
     /**
      * PostgreSQL sorts nulls first under DESC, and the indexes are declared
      * DESC NULLS LAST precisely so undated games do not lead the list.
+     *
+     * <p>This is the test that catches a regression to the one-argument
+     * {@code desc()}: without the explicit precedence the database's own default
+     * puts the undated game first, contradicting the expectation below.
      */
     @Test
     void sortsAnUndatedGameLastWhenDescending() {
-        storeDated(LocalDate.of(2026, 1, 1));
-        storeDated(LocalDate.of(2026, 6, 1));
+        UUID older = storeDated(LocalDate.of(2026, 1, 1));
+        UUID newer = storeDated(LocalDate.of(2026, 6, 1));
         UUID undated = storeDated(null);
 
-        assertThat(ids(games.find(sorted(SortDirection.DESC)))).endsWith(undated);
+        assertThat(ids(games.find(sorted(SortDirection.DESC))))
+                .containsExactly(newer, older, undated);
     }
 
     /**
-     * Nulls last in both directions is a deliberate choice: reversing the order must
-     * not make undated games jump from the bottom of the list to the top. It costs a
-     * sort, because a backwards scan of a DESC NULLS LAST index yields nulls first.
+     * Nulls last in both directions is a deliberate product decision: reversing the
+     * order must not make undated games jump from the bottom of the list to the top.
+     * It costs a sort, because a backwards scan of a DESC NULLS LAST index yields
+     * nulls first.
+     *
+     * <p>This test pins that decision rather than the mechanism. PostgreSQL already
+     * defaults ASC to nulls last, so it would pass even against a one-argument
+     * {@code asc()} — the regression to the one-argument overload is caught by
+     * {@link #sortsAnUndatedGameLastWhenDescending()}, where the database default is
+     * nulls first and contradicts the expectation. What this test does catch is the
+     * alternative the design rejected: ordering ASC with nulls first to keep the
+     * index, which would send undated games to the top of a reversed list.
+     *
+     * <p>The whole order is asserted, not just the last element, so that a change
+     * putting the dated games in the wrong order fails here too.
      */
     @Test
     void sortsAnUndatedGameLastWhenAscendingToo() {
-        storeDated(LocalDate.of(2026, 1, 1));
-        storeDated(LocalDate.of(2026, 6, 1));
+        UUID older = storeDated(LocalDate.of(2026, 1, 1));
+        UUID newer = storeDated(LocalDate.of(2026, 6, 1));
         UUID undated = storeDated(null);
 
-        assertThat(ids(games.find(sorted(SortDirection.ASC)))).endsWith(undated);
+        assertThat(ids(games.find(sorted(SortDirection.ASC))))
+                .containsExactly(older, newer, undated);
     }
 
     @Test
