@@ -1291,7 +1291,7 @@ In `services/core/src/main/java/com/chessapp/game/persistence/GameRepositoryAdap
 - [ ] **Step 6: Run the test and confirm it passes**
 
 Run: `mvn -f services/core/pom.xml verify -Dit.test=GameSearchIT`
-Expected: PASS, 18 tests.
+Expected: PASS, 17 tests.
 
 If ordering assertions fail with undated games appearing first, the null precedence is not reaching SQL — check that `jakarta.persistence.criteria.Nulls` is imported and the two-argument `builder.asc`/`builder.desc` overloads are being called, not the one-argument ones.
 
