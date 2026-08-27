@@ -28,6 +28,13 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import tools.jackson.databind.ObjectMapper;
 
+/**
+ * The container is shared across the whole class with no cleanup between methods, so
+ * a test that does not scope itself sees every game every other test ever created.
+ * Each import test therefore names its own players, and each list test filters on
+ * something only its own fixture matches — a unique event string, or the player id
+ * the import reported.
+ */
 @Testcontainers
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -46,10 +53,7 @@ class GameApiIT {
     @Autowired
     private GameRepository games;
 
-    /**
-     * The container is shared across the class with no cleanup between methods, so
-     * each test names its own players.
-     */
+    /** A complete, valid PGN for the two named players. */
     private static String pgn(String white, String black) {
         return """
                 [Event "Club Championship"]
@@ -358,22 +362,12 @@ class GameApiIT {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
     }
 
-    /**
-     * The class shares one container with no cleanup between methods, so an
-     * unfiltered list request sees every game every other test ever created. Every
-     * list test therefore scopes itself with a filter only its own fixture matches:
-     * a unique event string, or the player id the import reported.
-     *
-     * <p>That is why the defaults are asserted on a scoped request rather than on a
-     * parameterless one, which the design describes. A parameterless request here
-     * would see every game the import tests created and its assertions would depend
-     * on execution order. The defaults themselves — page 0, size 25 — are still what
-     * is being asserted, because none of them is supplied.
-     */
+    /** The same document with a caller-chosen event, which is how a list test scopes itself. */
     private static String pgnWithEvent(String white, String black, String event) {
         return pgnWithEvent(white, black, event, "2026.03.14");
     }
 
+    /** As above, with a caller-chosen date, for a test that needs two games to order. */
     private static String pgnWithEvent(String white, String black, String event, String date) {
         return """
                 [Event "%s"]
