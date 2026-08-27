@@ -1,6 +1,8 @@
 package com.chessapp.game.persistence;
 
 import com.chessapp.game.domain.Game;
+import com.chessapp.game.domain.GamePage;
+import com.chessapp.game.domain.GameQuery;
 import com.chessapp.game.domain.GameRepository;
 import com.chessapp.game.domain.GameSide;
 import com.chessapp.game.domain.NewGame;
@@ -13,9 +15,11 @@ import org.springframework.transaction.annotation.Transactional;
 class GameRepositoryAdapter implements GameRepository {
 
     private final GameJpaRepository jpa;
+    private final GameSearchQuery search;
 
-    GameRepositoryAdapter(GameJpaRepository jpa) {
+    GameRepositoryAdapter(GameJpaRepository jpa, GameSearchQuery search) {
         this.jpa = jpa;
+        this.search = search;
     }
 
     /**
@@ -55,6 +59,20 @@ class GameRepositoryAdapter implements GameRepository {
             return Optional.empty();
         }
         return jpa.findById(id).map(GameRepositoryAdapter::toDomain);
+    }
+
+    /**
+     * {@code readOnly} for one connection checkout instead of two and to keep
+     * Hibernate from dirty-checking a read — and explicitly <em>not</em> for
+     * consistency between the two statements it covers. Under PostgreSQL's default
+     * {@code READ COMMITTED} isolation each statement takes its own snapshot, so a
+     * concurrent write can still leave the rows and the total disagreeing. Closing
+     * that would need repeatable-read isolation, and nothing yet needs it.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public GamePage find(GameQuery query) {
+        return search.run(query);
     }
 
     private static Game toDomain(GameEntity entity) {

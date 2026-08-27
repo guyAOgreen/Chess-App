@@ -23,4 +23,13 @@ public interface GameRepository {
     Game save(NewGame candidate);
 
     Optional<Game> findById(UUID id);
+
+    /**
+     * One page of games matching the query, plus the size of the whole filtered
+     * set.
+     *
+     * <p>Returns an empty page rather than an empty {@code Optional}: the collection
+     * always exists, and it is the selection that can be empty.
+     */
+    GamePage find(GameQuery query);
 }

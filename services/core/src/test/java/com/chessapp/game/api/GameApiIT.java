@@ -1,6 +1,8 @@
 package com.chessapp.game.api;
 
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -26,6 +28,13 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import tools.jackson.databind.ObjectMapper;
 
+/**
+ * The container is shared across the whole class with no cleanup between methods, so
+ * a test that does not scope itself sees every game every other test ever created.
+ * Each import test therefore names its own players, and each list test filters on
+ * something only its own fixture matches — a unique event string, or the player id
+ * the import reported.
+ */
 @Testcontainers
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -44,10 +53,7 @@ class GameApiIT {
     @Autowired
     private GameRepository games;
 
-    /**
-     * The container is shared across the class with no cleanup between methods, so
-     * each test names its own players.
-     */
+    /** A complete, valid PGN for the two named players. */
     private static String pgn(String white, String black) {
         return """
                 [Event "Club Championship"]
@@ -354,5 +360,243 @@ class GameApiIT {
         mockMvc.perform(put("/api/games"))
                 .andExpect(status().isMethodNotAllowed())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+    }
+
+    /** The same document with a caller-chosen event, which is how a list test scopes itself. */
+    private static String pgnWithEvent(String white, String black, String event) {
+        return pgnWithEvent(white, black, event, "2026.03.14");
+    }
+
+    /** As above, with a caller-chosen date, for a test that needs two games to order. */
+    private static String pgnWithEvent(String white, String black, String event, String date) {
+        return """
+                [Event "%s"]
+                [Site "London ENG"]
+                [Date "%s"]
+                [Round "3.2"]
+                [White "%s"]
+                [Black "%s"]
+                [Result "1-0"]
+                [WhiteElo "1850"]
+                [ECO "C60"]
+
+                1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 1-0
+                """.formatted(event, date, white, black);
+    }
+
+    private String importForListing(String event) throws Exception {
+        return importing(pgnWithEvent("List White " + event, "List Black " + event, event))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+    }
+
+    @Test
+    void listsMatchingGamesWithTheDocumentedDefaults() throws Exception {
+        String event = "Listing " + UUID.randomUUID();
+        importForListing(event);
+
+        mockMvc.perform(get("/api/games").param("event", event))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(25))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1))
+                .andExpect(jsonPath("$.content[0].event").value(event))
+                .andExpect(jsonPath("$.content[0].white.name").value("List White " + event))
+                .andExpect(jsonPath("$.content[0].white.rating").value(1850))
+                .andExpect(jsonPath("$.content[0].black.rating").doesNotExist())
+                .andExpect(jsonPath("$.content[0].playedOn").value("2026-03-14"))
+                .andExpect(jsonPath("$.content[0].result").value("WHITE_WON"))
+                .andExpect(jsonPath("$.content[0].eco").value("C60"))
+                .andExpect(jsonPath("$.content[0].source").value("PGN_IMPORT"));
+    }
+
+    /**
+     * A page of 25 rows would otherwise carry 25 complete move lists to render a
+     * table that shows none of them.
+     */
+    @Test
+    void doesNotCarryTheMovesOnAListRow() throws Exception {
+        String event = "Moveless " + UUID.randomUUID();
+        importForListing(event);
+
+        mockMvc.perform(get("/api/games").param("event", event))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].movetext").doesNotExist())
+                .andExpect(jsonPath("$.content[0].sourcePgn").doesNotExist());
+    }
+
+    @Test
+    void filtersByPlayerAndColour() throws Exception {
+        String event = "Coloured " + UUID.randomUUID();
+        String body = importForListing(event);
+        String whitePlayerId = objectMapper.readTree(body).get("white").get("playerId").asString();
+
+        mockMvc.perform(get("/api/games")
+                        .param("playerId", whitePlayerId)
+                        .param("colour", "WHITE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].event").value(event));
+
+        mockMvc.perform(get("/api/games")
+                        .param("playerId", whitePlayerId)
+                        .param("colour", "BLACK"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(0)))
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    void answersAnEmptyPageWhenNothingMatches() throws Exception {
+        mockMvc.perform(get("/api/games").param("event", "Nothing " + UUID.randomUUID()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(0)))
+                .andExpect(jsonPath("$.totalElements").value(0))
+                .andExpect(jsonPath("$.totalPages").value(0));
+    }
+
+    /**
+     * The whole point of GameSort being an enum: an unknown sort field fails in
+     * conversion, before a query exists, rather than being concatenated into one.
+     */
+    @Test
+    void rejectsASortFieldOutsideTheWhitelist() throws Exception {
+        mockMvc.perform(get("/api/games").param("sort", "movetext"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+    }
+
+    @Test
+    void rejectsAColourWithNoPlayerToNarrow() throws Exception {
+        mockMvc.perform(get("/api/games").param("colour", "WHITE"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+    }
+
+    @Test
+    void rejectsAnUnsatisfiableDateRange() throws Exception {
+        mockMvc.perform(get("/api/games")
+                        .param("from", "2026-06-01")
+                        .param("to", "2026-01-01"))
+                .andExpect(status().isBadRequest());
+    }
+
+    /**
+     * The unsatisfiable-range test above proves the cross-field rule fires, but it
+     * cannot prove from and to reach the query at all — it would answer 400 just the
+     * same against a date filter that was never wired through. This asserts the
+     * filter actually filters.
+     */
+    @Test
+    void filtersByDateRange() throws Exception {
+        String event = "Dated " + UUID.randomUUID();
+        importForListing(event);
+
+        mockMvc.perform(get("/api/games")
+                        .param("event", event)
+                        .param("from", "2026-03-01")
+                        .param("to", "2026-03-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].playedOn").value("2026-03-14"));
+
+        mockMvc.perform(get("/api/games")
+                        .param("event", event)
+                        .param("from", "2026-04-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(0)));
+    }
+
+    @Test
+    void rejectsAPageSizeBeyondTheCap() throws Exception {
+        mockMvc.perform(get("/api/games").param("size", "500"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void rejectsAPageOfNoRows() throws Exception {
+        mockMvc.perform(get("/api/games").param("size", "0"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void rejectsANegativePage() throws Exception {
+        mockMvc.perform(get("/api/games").param("page", "-1"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void rejectsAMalformedPlayerIdentifier() throws Exception {
+        mockMvc.perform(get("/api/games").param("playerId", "not-a-uuid"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void rejectsAResultOutsideTheEnum() throws Exception {
+        mockMvc.perform(get("/api/games").param("result", "WHITE_LOST"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void rejectsAnEventTermBeyondTheLengthCap() throws Exception {
+        mockMvc.perform(get("/api/games").param("event", "x".repeat(256)))
+                .andExpect(status().isBadRequest());
+    }
+
+    /**
+     * Every other parameter is proven to bind by a 400 that could not occur if it
+     * were silently ignored. direction had neither a positive nor a negative test,
+     * so renaming the record component would have pinned every list request to DESC
+     * with the whole suite still green. This asserts the order actually flips.
+     */
+    @Test
+    void bindsTheSortDirection() throws Exception {
+        String event = "Directional " + UUID.randomUUID();
+        importing(pgnWithEvent("Dir Early " + event, "Dir Early Black " + event, event,
+                "2026.01.05")).andExpect(status().isCreated());
+        importing(pgnWithEvent("Dir Late " + event, "Dir Late Black " + event, event,
+                "2026.09.20")).andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/games").param("event", event).param("direction", "DESC"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(jsonPath("$.content[0].playedOn").value("2026-09-20"))
+                .andExpect(jsonPath("$.content[1].playedOn").value("2026-01-05"));
+
+        mockMvc.perform(get("/api/games").param("event", event).param("direction", "ASC"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(jsonPath("$.content[0].playedOn").value("2026-01-05"))
+                .andExpect(jsonPath("$.content[1].playedOn").value("2026-09-20"));
+    }
+
+    @Test
+    void rejectsASortDirectionOutsideTheEnum() throws Exception {
+        mockMvc.perform(get("/api/games").param("direction", "SIDEWAYS"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+    }
+
+    /**
+     * The plainest request there is, and the only one that reaches the query with no
+     * predicates at all. The class shares a container with no cleanup, so this
+     * asserts only what is independent of what other tests created: the status, the
+     * envelope, and the documented defaults. Content is asserted by the scoped tests.
+     */
+    @Test
+    void answersAParameterlessRequestWithTheEnvelopeAndTheDefaults() throws Exception {
+        importForListing("Unscoped " + UUID.randomUUID());
+
+        mockMvc.perform(get("/api/games"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(25))
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.totalElements").isNumber())
+                .andExpect(jsonPath("$.totalPages").isNumber());
     }
 }

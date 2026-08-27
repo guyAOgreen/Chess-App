@@ -4,12 +4,14 @@ import com.chessapp.chess.PgnError;
 import com.chessapp.game.application.ImportPgn;
 import com.chessapp.game.application.PgnImportResult;
 import com.chessapp.game.domain.Game;
+import com.chessapp.game.domain.GameRepository;
 import jakarta.validation.Valid;
 import java.net.URI;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -29,9 +31,11 @@ public class GameController {
     private static final URI INVALID_PGN = URI.create("/errors/invalid-pgn");
 
     private final ImportPgn importPgn;
+    private final GameRepository games;
 
-    public GameController(ImportPgn importPgn) {
+    public GameController(ImportPgn importPgn, GameRepository games) {
         this.importPgn = importPgn;
+        this.games = games;
     }
 
     @PostMapping
@@ -40,6 +44,25 @@ public class GameController {
             case PgnImportResult.Imported imported -> created(imported.game());
             case PgnImportResult.Rejected rejected -> invalidPgn(rejected.error());
         };
+    }
+
+    /**
+     * Calls the repository directly rather than through an application-layer class.
+     * Binding the parameters and mapping the page are both DTO conversion, which is
+     * this layer's job, and there is nothing left to orchestrate — a use case here
+     * would be a single delegating line. {@code GameRepository} is declared in the
+     * domain, so this is the API layer depending on a domain port rather than on
+     * persistence; what it does skip is the application layer, and whether read
+     * paths should have one on principle is #41.
+     *
+     * <p>{@code params} is bound as a model attribute by constructor binding.
+     * {@code @Valid} makes a failed binding or a violated constraint a
+     * {@code MethodArgumentNotValidException}, which Spring renders as 400
+     * problem+json because {@code spring.mvc.problemdetails.enabled} is on.
+     */
+    @GetMapping
+    public GamePageResponse listGames(@Valid GameListParams params) {
+        return GamePageResponse.from(games.find(params.toQuery()));
     }
 
     /**
