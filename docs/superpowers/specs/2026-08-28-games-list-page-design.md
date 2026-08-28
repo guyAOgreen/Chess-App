@@ -298,8 +298,8 @@ GameFilters  { values: GameFilterValues;
 
 GameTable    { games: GameSummary[] }          // non-empty; the page owns "none"
 GameRow      { game: GameSummary }
-GamePager    { page: number; size: number; totalElements: number;
-               totalPages: number; onPageChange: (page: number) => void }
+GamePager    { page: number; totalElements: number; totalPages: number;
+               onPageChange: (page: number) => void }
 ```
 
 `GameTable` takes a non-empty list deliberately. "No games match these filters" and
@@ -321,7 +321,7 @@ that should be one file.
         └────────┬─────────┘
                  │ query
                  ▼
-        ┌──────────────────┐   fetchGames(query, signal)
+        ┌──────────────────┐   fetchGames(gamesPath(query), signal)
         │ useGames         │ ─────────────────────────────▶ GET /api/games?…
         │  abort on change │
         │  keep prev page  │ ◀─────────────────────────────  GamePageResponse
@@ -362,9 +362,11 @@ keystroke so the input stays responsive; `query.event` is the debounced value, s
 the request waits. Keeping both on one hook is what stops a component from having
 to know the debounce exists.
 
-`useGames` keys its effect on the serialised query string. That is the honest
-dependency — the string *is* the request — and it sidesteps the object-identity
-trap where a new object literal each render refetches forever.
+The API module splits into `gamesPath(query)`, which serialises, and
+`fetchGames(path, signal)`, which requests. That split exists so `useGames` can key
+its effect on the path. It is the honest dependency — the string *is* the request —
+and being a string it sidesteps the object-identity trap where a query object built
+fresh on every render refetches forever.
 
 ```ts
 type GamesState =
@@ -378,8 +380,9 @@ function useGames(query: GamesQuery): { state: GamesState; retry: () => void }
 `retry` increments a counter the effect depends on, so a failed request can be
 re-run without the user having to change a filter to provoke one.
 
-The client never sends `size`; the response reports the size the server applied, and
-the pager reads it from there. One fewer parameter to keep in agreement.
+The client never sends `size`, and never reads it back either: the pager needs the
+current page, the total pages and the total games, and derives nothing from the page
+size. One fewer parameter to keep in agreement.
 
 ## Page states
 
@@ -403,7 +406,8 @@ they never set.
 
 ## Rendering detail
 
-A row is: White (rating) — Black (rating), result, date, event, site, round, ECO.
+A row is: White (rating) — Black (rating), result, date, event, site, round, ECO,
+source.
 
 * `result` renders as its PGN token — `1-0`, `0-1`, `½-½`, `*` — because that is
   what a chess player reads. The mapping is a record in `format.ts`, not a switch in
@@ -423,7 +427,7 @@ Accessibility: the filters are a `<form>` with a `<label>` per control; the resu
 count and the empty message live in a `role="status"` region so a screen reader is
 told the list changed; the table wrapper carries `aria-busy` during a refresh. The
 table scrolls horizontally inside its wrapper rather than collapsing to cards —
-eight columns do not fit a phone, and designing a mobile layout for a screen nobody
+nine columns do not fit a phone, and designing a mobile layout for a screen nobody
 has used is guesswork.
 
 ## Testing
