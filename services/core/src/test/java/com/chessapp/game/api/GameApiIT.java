@@ -599,4 +599,118 @@ class GameApiIT {
                 .andExpect(jsonPath("$.totalElements").isNumber())
                 .andExpect(jsonPath("$.totalPages").isNumber());
     }
+
+    /** Imports a game and reports the identifier the endpoint assigned it. */
+    private String importForDetail(String label) throws Exception {
+        String body = importing(pgn("Detail White " + label, "Detail Black " + label))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        return objectMapper.readTree(body).get("id").asString();
+    }
+
+    /**
+     * The moves are the reason this endpoint exists: the list row deliberately has
+     * no movetext, so a viewer that opens a game has nowhere else to get them.
+     */
+    @Test
+    void answersTheStoredGameForItsIdentifier() throws Exception {
+        String label = UUID.randomUUID().toString();
+        String id = importForDetail(label);
+
+        mockMvc.perform(get("/api/games/" + id))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.id").value(id))
+                .andExpect(jsonPath("$.white.name").value("Detail White " + label))
+                .andExpect(jsonPath("$.black.name").value("Detail Black " + label))
+                .andExpect(jsonPath("$.white.rating").value(1850))
+                .andExpect(jsonPath("$.black.rating").doesNotExist())
+                .andExpect(jsonPath("$.event").value("Club Championship"))
+                .andExpect(jsonPath("$.playedOn").value("2026-03-14"))
+                .andExpect(jsonPath("$.result").value("WHITE_WON"))
+                .andExpect(jsonPath("$.eco").value("C60"))
+                .andExpect(jsonPath("$.source").value("PGN_IMPORT"))
+                .andExpect(jsonPath("$.movetext").value("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6"));
+    }
+
+    /**
+     * The Location header POST already returns has pointed at nothing until now.
+     * Following it is what makes the created resource actually retrievable, and this
+     * fails if either side of that contract drifts.
+     */
+    @Test
+    void answersTheGameAtTheLocationTheImportReported() throws Exception {
+        MvcResult created = importing(pgn("Located White " + UUID.randomUUID(),
+                        "Located Black " + UUID.randomUUID()))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String location = created.getResponse().getHeader("Location");
+        String id = objectMapper.readTree(created.getResponse().getContentAsString())
+                .get("id").asString();
+
+        mockMvc.perform(get(location))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id));
+    }
+
+    /**
+     * problem+json rather than an empty body: application.yml turns problem details
+     * on so that one API has one error shape, and a bare 404 would be the exception.
+     *
+     * <p>The detail is asserted because without it this test cannot fail. An
+     * unmapped path already answers 404 problem+json from the static-resource
+     * fallback, so status and content type alone pass just as well against an
+     * endpoint that does not exist. The message is what proves a handler ran.
+     */
+    @Test
+    void answersNotFoundForAnIdentifierThatMatchesNoGame() throws Exception {
+        mockMvc.perform(get("/api/games/" + UUID.randomUUID()))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.detail").value("No game with that identifier"));
+    }
+
+    /**
+     * 400 rather than 404, matching the malformed playerId on the list endpoint: an
+     * identifier that is not a UUID is a bad request, not a game that is absent, and
+     * a client can tell the two apart.
+     */
+    @Test
+    void rejectsAMalformedGameIdentifier() throws Exception {
+        mockMvc.perform(get("/api/games/not-a-uuid"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+    }
+
+    /**
+     * The limit of the 400/404 split above, pinned rather than left to be
+     * rediscovered. {@code UUID.fromString} accepts non-canonical dash-separated
+     * forms and widens each group, so this identifier parses, misses, and is
+     * reported as a game that is not here rather than as a malformed request.
+     *
+     * <p>This documents current behaviour; it passed the first time it was run. It
+     * is here so that a later change to strict parsing is a deliberate one that
+     * breaks a test, rather than a silent change to what a client is told.
+     */
+    @Test
+    void treatsANonCanonicalIdentifierThatStillParsesAsAMiss() throws Exception {
+        mockMvc.perform(get("/api/games/1-1-1-1-1"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("No game with that identifier"));
+    }
+
+    /**
+     * ADR 0002 again, on the endpoint most tempted to leak it: the detail response
+     * is where a submitted document would look most at home.
+     */
+    @Test
+    void doesNotExposeTheSubmittedDocumentOnTheDetail() throws Exception {
+        String id = importForDetail(UUID.randomUUID().toString());
+
+        mockMvc.perform(get("/api/games/" + id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sourcePgn").doesNotExist())
+                .andExpect(jsonPath("$.pgn").doesNotExist());
+    }
 }
