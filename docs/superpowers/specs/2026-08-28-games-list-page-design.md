@@ -149,7 +149,8 @@ is `keepPreviousData` by hand, and it is four lines.
 ### 7. Types are hand-written now and generated later
 
 `features/games/types/game.ts` mirrors `GameSummaryResponse`, `GamePageResponse` and
-the four enums by hand, with a comment naming
+the three enums used by this feature (`GameResult`, `GameSource` and `GameColour`)
+by hand, with a comment naming
 [#27](https://github.com/guyAOgreen/Chess-App/issues/27) as the change that deletes
 it.
 
@@ -172,19 +173,33 @@ Two changes, both shared:
 `null` and `''`. Filters are absent far more often than present, and the alternative
 is conditional string assembly at each call site.
 
-`getJson` becomes a discriminated result:
+`getJson(path, options?)` accepts `{ signal?: AbortSignal }` so a caller can cancel
+the request — decision 6 needs this and cannot work without it — and becomes a
+discriminated result:
 
 ```ts
 type JsonResponse<T> =
   | { kind: 'body'; ok: boolean; status: number; data: T }
-  | { kind: 'no-body'; status: number }
+  | { kind: 'invalid-body'; ok: boolean; status: number; message: string }
   | { kind: 'unreachable'; message: string };
 ```
 
 Today it calls `response.json()` unconditionally, which is fine against the two
 endpoints it has met and throws a `SyntaxError` the moment a proxy or a container
-answers with HTML — a parse error surfacing as if the network were down. The three
-cases are genuinely different and a caller should be made to say which it means.
+answers with HTML. That response is reachable but violates the expected JSON
+contract, so it becomes `invalid-body`; an empty body is the same contract failure.
+Only a rejected `fetch` becomes `unreachable`. The three cases are genuinely
+different and a caller should be made to say which it means.
+
+Not `RequestInit`. `getJson` sets its own `Accept` header, and a caller passing one
+would silently replace it; the narrow options type makes the helper's one variable —
+cancellation — the only thing a caller can vary. A request with a method and a body
+is a different helper, written when `POST /api/games` gets a UI.
+
+An aborted `fetch` rejects, so a cancelled request arrives here as `unreachable`.
+`getJson` does not try to distinguish it: it cannot know whether the abort was
+deliberate. `useGames` owns that policy and checks its own signal before touching
+state.
 
 Health keeps its unusual requirement — Actuator's 503 carries a meaningful body —
 and expresses it as `kind === 'body'`, ignoring `ok`. It is the reason the union
@@ -231,7 +246,7 @@ to build one is already on screen the day it is wanted.
 
 ### 12. The date inputs bound each other
 
-`from` sets the `max` of the `to` input, and `to` sets the `min` of `from`.
+`from` sets the `min` of the `to` input, and `to` sets the `max` of `from`.
 
 #8 rejects `from` after `to` with a 400 — a correct refusal of a client defect. The
 client should not produce the defect. This matters more than it looks right now,
@@ -401,6 +416,9 @@ A row is: White (rating) — Black (rating), result, date, event, site, round, E
   `2024-05-01` is unambiguous, and it is what the PGN `Date` tag holds.
 * `source` renders as a humanised label — `PGN_IMPORT` → "PGN import".
 
+The event input has `maxLength={255}`, matching the API boundary rather than
+allowing the form to create a request the backend must reject.
+
 Accessibility: the filters are a `<form>` with a `<label>` per control; the result
 count and the empty message live in a `role="status"` region so a screen reader is
 told the list changed; the table wrapper carries `aria-busy` during a refresh. The
@@ -439,8 +457,9 @@ only when nothing is set.
 ### `GameFilters.test.tsx`
 
 Driven with `user-event`: each control raises `onChange` with the right key and a
-parsed value; an emptied text field raises `undefined` rather than `''`; the date
-inputs carry each other's bound; Clear raises `onClear`.
+parsed value; an emptied text field raises `undefined` rather than `''`; the event
+input enforces the 255-character limit; the date inputs carry each other's bound in
+the correct direction; Clear raises `onClear`.
 
 ### `GameTable.test.tsx` / `GameRow.test.tsx`
 
@@ -461,8 +480,8 @@ returned rows render. Plus both empty states and the failure state.
 ### `lib/api.test.ts`
 
 `queryString` drops `undefined`, `null` and `''`, keeps `0`, and encodes. `getJson`
-returns `body` for JSON at any status, `no-body` for an HTML error page, and
-`unreachable` when `fetch` rejects.
+returns `body` for JSON at any status, `invalid-body` for an HTML or empty response,
+and `unreachable` when `fetch` rejects.
 
 ### Not tested
 
@@ -480,10 +499,11 @@ centring `#root` rules, so the existing card's appearance changes. It is the onl
 other thing on the page, its tests assert text rather than layout, and the change is
 visually checked when the page is run.
 
-**A rejected request cannot say what was wrong.** #43. Decision 12 removes the one
-rejection the form could provoke, and `size`/`page` are not user-editable, so a 400
-should be unreachable from the UI. If one arrives, the user sees a generic message —
-which is the honest state of the API today, and improves for free when #43 lands.
+**A rejected request cannot say what was wrong.** #43. Decisions 2 and 12 plus the
+event input's length limit remove every rejection the form could provoke, and
+`size` and `page` are not user-editable, so a 400 should be unreachable from the UI.
+If one arrives the user sees a generic message — which is the honest state of the
+API today, and improves for free when #43 lands.
 
 **No authentication.** [#25](https://github.com/guyAOgreen/Chess-App/issues/25).
 The page lists every game in the database to anyone who opens it, because the
