@@ -11,9 +11,8 @@ import java.util.UUID;
  * A game as a row of the list: {@link GameResponse}'s shape without the moves.
  *
  * <p>A page of 25 games would otherwise ship 25 complete move lists to render a
- * table that displays none of them. #9 keeps returning the full
- * {@code GameResponse} for one game, so the viewer still gets {@code movetext} when
- * it opens one.
+ * table that displays none of them. {@code GET /api/games/{id}} returns the full
+ * {@link GameResponse}, so the viewer still gets {@code movetext} when it opens one.
  *
  * <p>Reuses {@link GameResponse.Side} rather than redeclaring an identical nested
  * record: it is the same concept, in the same package, and a client should see one

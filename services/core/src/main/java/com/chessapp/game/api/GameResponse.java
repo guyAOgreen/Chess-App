@@ -8,7 +8,7 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 /**
- * The game detail representation. #9 returns this same shape for a single game.
+ * The game detail representation, returned by {@code GET /api/games/{id}}.
  *
  * <p>The detail representation only. The list endpoint returns
  * {@link GameSummaryResponse}, which is this shape without {@code movetext}: a page
