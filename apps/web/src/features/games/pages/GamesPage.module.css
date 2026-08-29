@@ -1,0 +1,35 @@
+.page {
+  text-align: left;
+  padding: 24px 0;
+}
+
+/* Nine columns do not fit a narrow screen. Scrolling the table is honest;
+   inventing a card layout for a screen nobody has used is guesswork. */
+.tableWrapper {
+  overflow-x: auto;
+}
+
+.tableWrapper[aria-busy='true'] {
+  opacity: 0.6;
+}
+
+.failure {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--accent-border);
+  border-radius: 4px;
+  background: var(--accent-bg);
+}
+
+.failure button {
+  font: inherit;
+  font-size: 15px;
+  color: var(--text-h);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
