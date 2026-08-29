@@ -44,25 +44,72 @@ describe('GamesPage', () => {
     render(<GamesPage />);
 
     expect(screen.getByText(/loading games/i)).toBeInTheDocument();
+    // The form has to be usable while still loading, not just once something arrives.
+    expect(screen.getByLabelText(/event/i)).toBeEnabled();
     expect(await screen.findByText('Hastings')).toBeInTheDocument();
     expect(screen.getByText('Carlsen, M (2839)')).toBeInTheDocument();
   });
 
-  it('sends the event term once typing settles, asking for the first page', async () => {
-    const fetchStub = vi.fn().mockResolvedValue(respondWith(page([game('1', 'Hastings')])));
+  it('pages forward through the pager, requesting the next page', async () => {
+    const twoPages: GamePage = {
+      content: [game('1', 'Hastings')],
+      page: 0,
+      size: 25,
+      totalElements: 30,
+      totalPages: 2,
+    };
+    const fetchStub = vi.fn().mockResolvedValue(respondWith(twoPages));
     vi.stubGlobal('fetch', fetchStub);
 
     render(<GamesPage />);
     await screen.findByText('Hastings');
 
-    await userEvent.type(screen.getByLabelText(/event/i), 'Hast');
+    fetchStub.mockClear();
+    await userEvent.click(screen.getByRole('button', { name: /next/i }));
 
     await waitFor(() => {
       const paths = fetchStub.mock.calls.map((call) => call[0] as string);
-      expect(paths.some((path) => path.includes('event=Hast') && path.includes('page=0'))).toBe(
-        true,
-      );
+      expect(paths.some((path) => path.includes('page=1'))).toBe(true);
     });
+  });
+
+  it('sends the event term once typing settles, resetting to the first page', async () => {
+    const twoPages: GamePage = {
+      content: [game('1', 'Hastings')],
+      page: 0,
+      size: 25,
+      totalElements: 30,
+      totalPages: 2,
+    };
+    const fetchStub = vi.fn().mockResolvedValue(respondWith(twoPages));
+    vi.stubGlobal('fetch', fetchStub);
+
+    render(<GamesPage />);
+    await screen.findByText('Hastings');
+
+    // Leave page 0 first, so resetting to it on the next filter change is an
+    // actual transition rather than trivially true because nothing ever left it.
+    await userEvent.click(screen.getByRole('button', { name: /next/i }));
+    await waitFor(() => {
+      const paths = fetchStub.mock.calls.map((call) => call[0] as string);
+      expect(paths.some((path) => path.includes('page=1'))).toBe(true);
+    });
+
+    fetchStub.mockClear();
+    await userEvent.type(screen.getByLabelText(/event/i), 'Hast');
+
+    // The page reset is not debounced: it goes out as soon as the field changes,
+    // before the term itself has settled — exactly one request so far, and it
+    // does not carry the term yet.
+    expect(fetchStub).toHaveBeenCalledTimes(1);
+    expect(fetchStub.mock.calls[0][0] as string).toBe('/api/games?page=0');
+
+    await waitFor(() => {
+      expect(fetchStub).toHaveBeenCalledTimes(2);
+    });
+    const settledPath = fetchStub.mock.calls[1][0] as string;
+    expect(settledPath).toContain('event=Hast');
+    expect(settledPath).toContain('page=0');
   });
 
   it('says the database is empty when nothing is filtered, and keeps the filters usable', async () => {

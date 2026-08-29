@@ -14,5 +14,6 @@ describe('App', () => {
     render(<App />);
 
     expect(screen.getByRole('heading', { name: /chess prep/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /games/i })).toBeInTheDocument();
   });
 });
