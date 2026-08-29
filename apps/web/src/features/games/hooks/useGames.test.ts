@@ -180,6 +180,29 @@ describe('useGames', () => {
     await waitFor(() => expect(result.current.state.kind).toBe('ready'));
   });
 
+  it('clears a failure when the filters change', async () => {
+    // The mutant this guards against: a `failed` state that only clears on
+    // `ready` or `loading` (i.e. `return current` for anything else) leaves
+    // the user staring at a stale error for the *old* filters while a
+    // request for the *new* ones is already loading underneath it.
+    const parkedSecond = deferred<Response>();
+    const fetchStub = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockReturnValueOnce(parkedSecond.promise);
+    vi.stubGlobal('fetch', fetchStub);
+
+    const { result, rerender } = renderHook(({ query }) => useGames(query), {
+      initialProps: { query: { event: 'Hastings', page: 0 } as GamesQuery },
+    });
+
+    await waitFor(() => expect(result.current.state.kind).toBe('failed'));
+
+    rerender({ query: { event: 'Wijk aan Zee', page: 0 } as GamesQuery });
+
+    expect(result.current.state.kind).toBe('loading');
+  });
+
   it('aborts the in-flight request when the query changes', async () => {
     // The mechanism the superseded-response test relies on: without a real
     // `abort()` call in the effect's cleanup, there is no signal for the

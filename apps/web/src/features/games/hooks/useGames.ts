@@ -36,9 +36,10 @@ export function useGames(query: GamesQuery): UseGames {
   useEffect(() => {
     const controller = new AbortController();
 
+    // oxlint-disable-next-line react/set-state-in-effect -- the refetch decision depends on the previously settled state, which is not derivable during render
     setState((current) => {
       if (current.kind === 'ready') {
-        return { ...current, refreshing: true };
+        return current.refreshing ? current : { ...current, refreshing: true };
       }
       return current.kind === 'loading' ? current : { kind: 'loading' };
     });

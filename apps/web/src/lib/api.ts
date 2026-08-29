@@ -20,7 +20,7 @@ export function queryString(params: QueryParams): string {
  * Three outcomes, because they mean three different things and a caller should
  * have to say which it is handling.
  *
- * <p>`body` is a response carrying JSON, whatever its status: Actuator health and
+ * `body` is a response carrying JSON, whatever its status: Actuator health and
  * problem+json rejections both put the answer in the body of a non-2xx.
  * `invalid-body` is a response that arrived and was not JSON — an HTML error page
  * from a proxy, or an empty body. `unreachable` is a `fetch` that never produced a
