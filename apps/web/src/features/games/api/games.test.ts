@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fetchGames, gamesPath, GamesRequestFailed } from './games';
-import type { GamePage } from '../types/game';
+import type { GamePage, GamesQuery } from '../types/game';
 
 const EMPTY_PAGE: GamePage = {
   content: [],
@@ -16,6 +16,20 @@ function jsonResponse(body: unknown, status = 200): Response {
     status,
     json: async () => body,
   } as unknown as Response;
+}
+
+function nonJsonResponse(status: number): Response {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => {
+      throw new SyntaxError('Unexpected token <');
+    },
+  } as unknown as Response;
+}
+
+async function failureOf(path: string): Promise<unknown> {
+  return fetchGames(path).catch((error: unknown) => error);
 }
 
 afterEach(() => {
@@ -55,8 +69,7 @@ describe('gamesPath', () => {
       sort: 'PLAYED_ON',
       direction: 'DESC',
       size: 25,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any);
+    } as unknown as GamesQuery);
 
     expect(path).not.toContain('sort');
     expect(path).not.toContain('direction');
@@ -82,31 +95,42 @@ describe('fetchGames', () => {
     await expect(fetchGames('/api/games?page=0')).resolves.toEqual(EMPTY_PAGE);
   });
 
-  it('fails when the server rejects the request', async () => {
+  it('fails when the server rejects the request, naming the status in the message', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ title: 'Bad Request' }, 400)));
 
-    await expect(fetchGames('/api/games?page=0')).rejects.toBeInstanceOf(GamesRequestFailed);
+    const failure = await failureOf('/api/games?page=0');
+
+    expect(failure).toBeInstanceOf(GamesRequestFailed);
+    expect((failure as Error).message).toMatch(/\(400\)/);
   });
 
-  it('fails when the response is not JSON', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 502,
-        json: async () => {
-          throw new SyntaxError('Unexpected token <');
-        },
-      } as unknown as Response),
-    );
+  it('fails when a non-2xx response is not JSON, distinguishing it from a rejected request', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(nonJsonResponse(502)));
 
-    await expect(fetchGames('/api/games?page=0')).rejects.toBeInstanceOf(GamesRequestFailed);
+    const failure = await failureOf('/api/games?page=0');
+
+    expect(failure).toBeInstanceOf(GamesRequestFailed);
+    expect((failure as Error).message).toMatch(/502/);
+    expect((failure as Error).message).toMatch(/not JSON/);
+  });
+
+  it('fails when a 200 response is not JSON — e.g. a proxy serving its index.html', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(nonJsonResponse(200)));
+
+    const failure = await failureOf('/api/games?page=0');
+
+    expect(failure).toBeInstanceOf(GamesRequestFailed);
+    expect((failure as Error).message).toMatch(/200/);
+    expect((failure as Error).message).toMatch(/not JSON/);
   });
 
   it('fails, reporting the transport message, when the backend cannot be reached', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
 
-    await expect(fetchGames('/api/games?page=0')).rejects.toThrow('Failed to fetch');
+    const failure = await failureOf('/api/games?page=0');
+
+    expect(failure).toBeInstanceOf(GamesRequestFailed);
+    expect((failure as Error).message).toBe('Failed to fetch');
   });
 
   it('passes the abort signal through', async () => {
@@ -116,6 +140,6 @@ describe('fetchGames', () => {
 
     await fetchGames('/api/games?page=0', controller.signal);
 
-    expect(fetchStub.mock.calls[0][1]).toMatchObject({ signal: controller.signal });
+    expect(fetchStub.mock.calls[0][1].signal).toBe(controller.signal);
   });
 });

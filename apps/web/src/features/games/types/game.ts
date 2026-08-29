@@ -8,8 +8,8 @@
  * control. Until then this is the single place the shape is spoken, so drift has
  * one place to be corrected.
  *
- * The arrays exist so a test can iterate every value; the types are derived
- * from them so the two cannot disagree.
+ * The arrays are structured so a future test can iterate every value; the
+ * types are derived from them so the two cannot disagree.
  */
 
 export const GAME_RESULTS = ['WHITE_WON', 'BLACK_WON', 'DRAW', 'UNFINISHED'] as const;

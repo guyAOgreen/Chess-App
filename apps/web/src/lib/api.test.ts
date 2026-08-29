@@ -88,7 +88,7 @@ describe('getJson', () => {
 
     await getJson('/api/games', { signal: controller.signal });
 
-    expect(fetchStub.mock.calls[0][1]).toMatchObject({ signal: controller.signal });
+    expect(fetchStub.mock.calls[0][1].signal).toBe(controller.signal);
   });
 
   it('always sends an Accept: application/json header, which a caller cannot override', async () => {
