@@ -73,9 +73,9 @@ export function useGameFilters(): UseGameFilters {
     [state.values, state.page, settledEvent],
   );
 
-  const isFiltered = Object.values(state.values).some(
-    (value) => value !== undefined && value !== '',
-  );
+  // GameFilters.orUndefined turns a blank control into `undefined` before it
+  // ever reaches setFilter, so an empty string never enters `state.values`.
+  const isFiltered = Object.values(state.values).some((value) => value !== undefined);
 
   return { values: state.values, query, isFiltered, setFilter, setPage, clear };
 }

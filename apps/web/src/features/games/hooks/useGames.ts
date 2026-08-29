@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { fetchGames, gamesPath } from '../api/games';
+import { messageOf } from '../../../lib/api';
 import type { GamePage, GamesQuery } from '../types/game';
 
 export type GamesState =
@@ -56,7 +57,7 @@ export function useGames(query: GamesQuery): UseGames {
         }
         setState({
           kind: 'failed',
-          message: error instanceof Error ? error.message : String(error),
+          message: messageOf(error),
         });
       });
 

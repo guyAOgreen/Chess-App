@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchBackendHealth, type BackendHealth } from '../api/health';
+import { messageOf } from '../../../lib/api';
 
 export type HealthState =
   | { kind: 'loading' }
@@ -20,8 +21,7 @@ export function useBackendHealth(): HealthState {
       })
       .catch((error: unknown) => {
         if (active) {
-          const message = error instanceof Error ? error.message : String(error);
-          setState({ kind: 'unreachable', message });
+          setState({ kind: 'unreachable', message: messageOf(error) });
         }
       });
 

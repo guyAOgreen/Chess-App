@@ -124,13 +124,18 @@ describe('fetchGames', () => {
     expect((failure as Error).message).toMatch(/not JSON/);
   });
 
-  it('fails, reporting the transport message, when the backend cannot be reached', async () => {
+  it('fails with a written explanation, keeping the transport message as the cause', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
 
     const failure = await failureOf('/api/games?page=0');
 
     expect(failure).toBeInstanceOf(GamesRequestFailed);
-    expect((failure as Error).message).toBe('Failed to fetch');
+    // A user with a stopped backend must not see the bare browser string
+    // ("Failed to fetch" / "Load failed") alone on the page — but the cause
+    // must still be there for anyone diagnosing the failure.
+    expect((failure as Error).message).not.toBe('Failed to fetch');
+    expect((failure as Error).message).toMatch(/reach the server/);
+    expect((failure as Error).message).toContain('Failed to fetch');
   });
 
   it('passes the abort signal through', async () => {

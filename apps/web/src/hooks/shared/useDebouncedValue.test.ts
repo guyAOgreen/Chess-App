@@ -113,4 +113,27 @@ describe('useDebouncedValue', () => {
     });
     expect(result.current).toBe('b');
   });
+
+  it('treats a function as an opaque value, not as a lazy initialiser or updater', () => {
+    // useState(value) would call a function value to lazily compute its initial
+    // state, and setSettled(value) would call it as an updater — either way the
+    // hook would return the function's result instead of the function itself.
+    // That would make T secretly narrower than "any value", so this pins T down
+    // to genuinely mean any value, functions included.
+    const first = () => 'first';
+    const second = () => 'second';
+
+    const { result, rerender } = renderHook(({ value }) => useDebouncedValue(value, 300), {
+      initialProps: { value: first },
+    });
+
+    expect(result.current).toBe(first);
+
+    rerender({ value: second });
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(result.current).toBe(second);
+  });
 });

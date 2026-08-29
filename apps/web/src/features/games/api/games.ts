@@ -41,6 +41,6 @@ export async function fetchGames(path: string, signal?: AbortSignal): Promise<Ga
         `The server answered ${response.status} with something that is not JSON.`,
       );
     case 'unreachable':
-      throw new GamesRequestFailed(response.message);
+      throw new GamesRequestFailed(`Could not reach the server (${response.message}).`);
   }
 }

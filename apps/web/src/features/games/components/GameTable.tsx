@@ -11,6 +11,7 @@ import type { GameSummary } from '../types/game';
 export function GameTable({ games }: { games: GameSummary[] }) {
   return (
     <table className={styles.table}>
+      <caption className={styles.caption}>Games</caption>
       <thead>
         <tr>
           <th scope="col">White</th>

@@ -67,6 +67,8 @@ export async function getJson<T>(
   }
 }
 
-function messageOf(error: unknown): string {
+/** The idiom for turning a caught `unknown` into text worth showing or logging,
+ * shared so callers do not each repeat the `instanceof Error` check. */
+export function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }

@@ -30,6 +30,12 @@ const SPARSE: GameSummary = {
 };
 
 describe('GameTable', () => {
+  it('has an accessible name, so a screen reader announces what the table lists', () => {
+    render(<GameTable games={[COMPLETE]} />);
+
+    expect(screen.getByRole('table', { name: /games/i })).toBeInTheDocument();
+  });
+
   it('labels every column, in order, with a scope="col" header', () => {
     render(<GameTable games={[COMPLETE]} />);
 
