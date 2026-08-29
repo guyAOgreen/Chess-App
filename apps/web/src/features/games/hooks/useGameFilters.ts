@@ -1,0 +1,80 @@
+import { useCallback, useMemo, useReducer } from 'react';
+import { useDebouncedValue } from '../../../hooks/shared/useDebouncedValue';
+import type { GameFilterValues, GamesQuery } from '../types/game';
+
+const EVENT_DEBOUNCE_MS = 300;
+
+interface FilterState {
+  values: GameFilterValues;
+  page: number;
+}
+
+type FilterAction =
+  | { type: 'filter'; patch: Partial<GameFilterValues> }
+  | { type: 'page'; page: number }
+  | { type: 'clear' };
+
+const INITIAL: FilterState = { values: {}, page: 0 };
+
+/**
+ * Every filter action returns to page 0 in the same dispatch. Doing it here
+ * rather than in an effect that watches the filters means there is no render in
+ * which the filters have changed and the page has not.
+ */
+function reduce(state: FilterState, action: FilterAction): FilterState {
+  switch (action.type) {
+    case 'filter':
+      return { values: { ...state.values, ...action.patch }, page: 0 };
+    case 'page':
+      return { ...state, page: action.page };
+    case 'clear':
+      return INITIAL;
+  }
+}
+
+export interface UseGameFilters {
+  /** Raw, for the controlled inputs: updates on every keystroke. */
+  values: GameFilterValues;
+  /** What to request: the same filters with the event term debounced. */
+  query: GamesQuery;
+  isFiltered: boolean;
+  setFilter: <K extends keyof GameFilterValues>(key: K, value: GameFilterValues[K]) => void;
+  setPage: (page: number) => void;
+  clear: () => void;
+}
+
+/**
+ * Filter and page state in one place, so a component never has to know that the
+ * event term is debounced or that changing a filter moves the page.
+ */
+export function useGameFilters(): UseGameFilters {
+  const [state, dispatch] = useReducer(reduce, INITIAL);
+  const settledEvent = useDebouncedValue(state.values.event, EVENT_DEBOUNCE_MS);
+
+  const setFilter = useCallback(
+    <K extends keyof GameFilterValues>(key: K, value: GameFilterValues[K]) => {
+      // TypeScript cannot correlate a generic key `K` with `value: GameFilterValues[K]`
+      // once they are combined into a computed-key object literal inside the function
+      // body — the correlation that made the call site type-safe is lost here. The
+      // cast is a narrow, deliberate escape hatch for that known limitation; it does
+      // not weaken the public signature, which still rejects a mismatched key/value
+      // pair at every call site.
+      dispatch({ type: 'filter', patch: { [key]: value } as Partial<GameFilterValues> });
+    },
+    [],
+  );
+
+  const setPage = useCallback((page: number) => dispatch({ type: 'page', page }), []);
+  const clear = useCallback(() => dispatch({ type: 'clear' }), []);
+
+  const query = useMemo<GamesQuery>(
+    () => ({ ...state.values, event: settledEvent, page: state.page }),
+    [state.values, state.page, settledEvent],
+  );
+
+  const isFiltered = Object.values(state.values).some(
+    (value) => value !== undefined && value !== '',
+  );
+
+  return { values: state.values, query, isFiltered, setFilter, setPage, clear };
+}
