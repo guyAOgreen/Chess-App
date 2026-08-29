@@ -53,13 +53,7 @@ export function useGameFilters(): UseGameFilters {
 
   const setFilter = useCallback(
     <K extends keyof GameFilterValues>(key: K, value: GameFilterValues[K]) => {
-      // TypeScript cannot correlate a generic key `K` with `value: GameFilterValues[K]`
-      // once they are combined into a computed-key object literal inside the function
-      // body — the correlation that made the call site type-safe is lost here. The
-      // cast is a narrow, deliberate escape hatch for that known limitation; it does
-      // not weaken the public signature, which still rejects a mismatched key/value
-      // pair at every call site.
-      dispatch({ type: 'filter', patch: { [key]: value } as Partial<GameFilterValues> });
+      dispatch({ type: 'filter', patch: { [key]: value } });
     },
     [],
   );
@@ -67,6 +61,11 @@ export function useGameFilters(): UseGameFilters {
   const setPage = useCallback((page: number) => dispatch({ type: 'page', page }), []);
   const clear = useCallback(() => dispatch({ type: 'clear' }), []);
 
+  // Clearing while the event term is still settling briefly leaves `query.event`
+  // holding the old, pre-clear term for up to another 300ms while `values` and
+  // `isFiltered` update immediately: `values.event` is undefined, but a request
+  // for the old term is still in flight. This is accepted as designed — it
+  // self-corrects once the debounce settles — not an oversight.
   const query = useMemo<GamesQuery>(
     () => ({ ...state.values, event: settledEvent, page: state.page }),
     [state.values, state.page, settledEvent],

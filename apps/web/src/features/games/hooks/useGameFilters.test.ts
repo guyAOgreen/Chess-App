@@ -32,6 +32,23 @@ describe('useGameFilters', () => {
 
     expect(result.current.query.page).toBe(0);
     expect(result.current.values.result).toBe('DRAW');
+    // The filter must actually reach the request, not just the form: gamesPath
+    // reads result/from/to off `query` by name, so a query that silently drops
+    // a filter would issue an unfiltered request while the form still shows it applied.
+    expect(result.current.query.result).toBe('DRAW');
+  });
+
+  it('accumulates filters instead of replacing them', () => {
+    const { result } = renderHook(() => useGameFilters());
+
+    act(() => result.current.setFilter('result', 'DRAW'));
+    act(() => result.current.setFilter('from', '2024-01-01'));
+
+    // Setting a second filter must not wipe the first — the reducer merges the
+    // patch into the existing values rather than replacing them outright.
+    expect(result.current.values).toStrictEqual({ result: 'DRAW', from: '2024-01-01' });
+    expect(result.current.query.result).toBe('DRAW');
+    expect(result.current.query.from).toBe('2024-01-01');
   });
 
   it('clears every filter and returns to the first page', () => {
@@ -77,7 +94,14 @@ describe('useGameFilters', () => {
       expect(result.current.query.event).toBeUndefined();
 
       act(() => {
-        vi.advanceTimersByTime(300);
+        vi.advanceTimersByTime(299);
+      });
+
+      // Pins the debounce at exactly 300ms rather than "some delay > 0".
+      expect(result.current.query.event).toBeUndefined();
+
+      act(() => {
+        vi.advanceTimersByTime(1);
       });
 
       expect(result.current.query.event).toBe('Hast');
