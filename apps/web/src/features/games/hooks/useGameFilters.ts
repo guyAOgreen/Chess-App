@@ -61,11 +61,13 @@ export function useGameFilters(): UseGameFilters {
   const setPage = useCallback((page: number) => dispatch({ type: 'page', page }), []);
   const clear = useCallback(() => dispatch({ type: 'clear' }), []);
 
-  // Clearing while the event term is still settling briefly leaves `query.event`
+  // Clearing after the event term has already settled leaves `query.event`
   // holding the old, pre-clear term for up to another 300ms while `values` and
   // `isFiltered` update immediately: `values.event` is undefined, but a request
-  // for the old term is still in flight. This is accepted as designed — it
-  // self-corrects once the debounce settles — not an oversight.
+  // for the old term is still in flight. Clearing mid-burst, before anything has
+  // settled, is clean — there is no settled value yet to hold onto. This is
+  // accepted as designed — it self-corrects once the debounce settles — not an
+  // oversight.
   const query = useMemo<GamesQuery>(
     () => ({ ...state.values, event: settledEvent, page: state.page }),
     [state.values, state.page, settledEvent],
