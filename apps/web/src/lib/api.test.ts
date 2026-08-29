@@ -65,11 +65,12 @@ describe('getJson', () => {
 
     const response = await getJson('/api/games');
 
-    expect(response.kind).toBe('invalid-body');
-    if (response.kind === 'invalid-body') {
-      expect(response.status).toBe(502);
-      expect(response.ok).toBe(false);
-    }
+    expect(response).toEqual({
+      kind: 'invalid-body',
+      ok: false,
+      status: 502,
+      message: 'Unexpected token < in JSON at position 0',
+    });
   });
 
   it('reports a rejected fetch as unreachable', async () => {
@@ -88,5 +89,17 @@ describe('getJson', () => {
     await getJson('/api/games', { signal: controller.signal });
 
     expect(fetchStub.mock.calls[0][1]).toMatchObject({ signal: controller.signal });
+  });
+
+  it('always sends an Accept: application/json header, which a caller cannot override', async () => {
+    const fetchStub = vi.fn().mockResolvedValue(jsonResponse({}));
+    vi.stubGlobal('fetch', fetchStub);
+
+    await getJson('/api/games');
+
+    expect(fetchStub.mock.calls[0][1]).toEqual({
+      headers: { Accept: 'application/json' },
+      signal: undefined,
+    });
   });
 });
