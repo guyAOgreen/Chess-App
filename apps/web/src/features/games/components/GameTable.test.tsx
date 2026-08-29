@@ -30,6 +30,26 @@ const SPARSE: GameSummary = {
 };
 
 describe('GameTable', () => {
+  it('labels every column, in order, with a scope="col" header', () => {
+    render(<GameTable games={[COMPLETE]} />);
+
+    const headers = screen.getAllByRole('columnheader');
+    expect(headers.map((header) => header.textContent)).toEqual([
+      'White',
+      'Black',
+      'Result',
+      'Date',
+      'Event',
+      'Site',
+      'Round',
+      'ECO',
+      'Source',
+    ]);
+    for (const header of headers) {
+      expect(header).toHaveAttribute('scope', 'col');
+    }
+  });
+
   it('renders a row per game, in the order given', () => {
     render(<GameTable games={[COMPLETE, SPARSE]} />);
 

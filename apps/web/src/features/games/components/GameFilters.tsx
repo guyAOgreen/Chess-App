@@ -5,7 +5,7 @@ import { GAME_RESULTS, type GameFilterValues, type GameResult } from '../types/g
 /** The API treats blank and absent as the same thing, and so does the state: an
  * emptied control raises `undefined` rather than `''`. */
 function orUndefined(value: string): string | undefined {
-  return value === '' ? undefined : value;
+  return value.trim() === '' ? undefined : value;
 }
 
 export interface GameFiltersProps {

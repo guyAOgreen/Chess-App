@@ -76,4 +76,35 @@ describe('GameFilters', () => {
 
     expect(onClear).toHaveBeenCalled();
   });
+
+  it('raises undefined when the event term is only whitespace', async () => {
+    // The backend treats a blank searchTerm as absent and documents that a blank
+    // term reaching the query would silently drop every game with no event — so
+    // "   " must not be raised as a real filter value.
+    const onChange = vi.fn();
+    render(<GameFilters values={{}} onChange={onChange} onClear={vi.fn()} />);
+
+    await userEvent.type(screen.getByLabelText(/event/i), '   ');
+
+    expect(onChange).toHaveBeenLastCalledWith('event', undefined);
+  });
+
+  it('never submits: Enter in a field does not reload the page', () => {
+    // A real submit is a full-page reload jsdom cannot perform; if the guard is
+    // missing, the browser's default action fires and this handler never does,
+    // so asserting the event arrived with defaultPrevented is the reliable proxy.
+    render(<GameFilters values={{}} onChange={vi.fn()} onClear={vi.fn()} />);
+
+    const form = screen.getByLabelText(/event/i).closest('form') as HTMLFormElement;
+    const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
+    form.dispatchEvent(submitEvent);
+
+    expect(submitEvent.defaultPrevented).toBe(true);
+  });
+
+  it('makes the clear button inert to submission', () => {
+    render(<GameFilters values={{}} onChange={vi.fn()} onClear={vi.fn()} />);
+
+    expect(screen.getByRole('button', { name: /clear/i })).toHaveAttribute('type', 'button');
+  });
 });
