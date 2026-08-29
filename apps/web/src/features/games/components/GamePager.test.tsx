@@ -11,6 +11,14 @@ describe('GamePager', () => {
     expect(screen.getByText(/168 games/i)).toBeInTheDocument();
   });
 
+  it('announces the page change to screen reader users', () => {
+    // Clicking Next silently updates the label with no aria-live region; a
+    // screen-reader user gets no confirmation they moved.
+    render(<GamePager page={1} totalElements={168} totalPages={7} onPageChange={vi.fn()} />);
+
+    expect(screen.getByText(/page 2 of 7/i)).toHaveAttribute('aria-live', 'polite');
+  });
+
   it('cannot go back from the first page', () => {
     render(<GamePager page={0} totalElements={168} totalPages={7} onPageChange={vi.fn()} />);
 

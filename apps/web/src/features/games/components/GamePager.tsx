@@ -28,7 +28,7 @@ export function GamePager({ page, totalElements, totalPages, onPageChange }: Gam
       >
         Previous
       </button>
-      <span className={styles.position}>
+      <span className={styles.position} aria-live="polite">
         Page {page + 1} of {totalPages} · {games}
       </span>
       <button

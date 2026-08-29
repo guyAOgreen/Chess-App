@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { EM_DASH, orDash, resultLabel, sideLabel, sourceLabel } from './format';
+import { orDash, resultLabel, sideLabel, sourceLabel } from './format';
 import { GAME_RESULTS, GAME_SOURCES } from './types/game';
 
 describe('resultLabel', () => {
-  it('renders the PGN token, which is what a chess player reads', () => {
+  it('renders the display token a chess player reads, not the raw PGN token', () => {
     expect(resultLabel('WHITE_WON')).toBe('1-0');
     expect(resultLabel('BLACK_WON')).toBe('0-1');
+    // Deliberately not the backend's pgnToken ('1/2-1/2', per GameResult.java) —
+    // ½-½ is the display convention a chess player expects to read.
     expect(resultLabel('DRAW')).toBe('½-½');
     expect(resultLabel('UNFINISHED')).toBe('*');
   });
@@ -24,8 +26,15 @@ describe('resultLabel', () => {
 
 describe('sourceLabel', () => {
   it('humanises the enum constant', () => {
+    // Every value pinned explicitly: a loop with only toBeTruthy() would not
+    // catch two labels swapped with each other, or two sources sharing a label.
+    expect(sourceLabel('PERSONAL')).toBe('Personal');
+    expect(sourceLabel('CLUB')).toBe('Club');
     expect(sourceLabel('PGN_IMPORT')).toBe('PGN import');
+    expect(sourceLabel('LICHESS')).toBe('Lichess');
     expect(sourceLabel('CHESS_COM')).toBe('Chess.com');
+    expect(sourceLabel('MEGA_DATABASE')).toBe('Mega Database');
+    expect(sourceLabel('OTHER')).toBe('Other');
   });
 
   it('has a label for every source, distinct from the raw enum constant', () => {
@@ -51,7 +60,9 @@ describe('sideLabel', () => {
 
 describe('orDash', () => {
   it('renders absent metadata as an em dash, because an empty cell reads as broken', () => {
-    expect(orDash(null)).toBe(EM_DASH);
+    // Asserts the literal, not the EM_DASH constant under test — otherwise
+    // setting EM_DASH to '' would still pass.
+    expect(orDash(null)).toBe('—');
     expect(orDash('Hastings')).toBe('Hastings');
   });
 });

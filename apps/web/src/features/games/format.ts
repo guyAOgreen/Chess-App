@@ -13,6 +13,8 @@ export const EM_DASH = '—';
 const RESULT_LABELS: Record<GameResult, string> = {
   WHITE_WON: '1-0',
   BLACK_WON: '0-1',
+  // Deliberately not the backend's pgnToken ('1/2-1/2', per GameResult.java) —
+  // ½-½ is the display convention a chess player expects to read.
   DRAW: '½-½',
   UNFINISHED: '*',
 };
