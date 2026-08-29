@@ -54,29 +54,63 @@ describe('useDebouncedValue', () => {
     expect(result.current).toBe('Has');
   });
 
-  it('clears the pending timer on unmount', () => {
+  it('leaves no pending timer after unmount', () => {
     // A plain "advancing timers after unmount does not throw" assertion would pass
     // even without clearTimeout, because React 19 silently no-ops a state update on
-    // an unmounted component instead of warning or throwing. To actually catch a
-    // missing `clearTimeout`, spy on the global and assert it fires on unmount.
-    const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
-
+    // an unmounted component instead of warning or throwing. Asserting on the fake
+    // timer queue itself catches a missing cleanup without coupling to which API
+    // (clearTimeout vs. some future React internal) is used to achieve it.
     const { rerender, unmount } = renderHook(({ value }) => useDebouncedValue(value, 300), {
       initialProps: { value: 'a' },
     });
 
     rerender({ value: 'b' });
-    // The rerender itself triggers one clearTimeout call (cleanup of the effect
-    // scheduled for 'a'). Reset the spy so the assertion below is only about unmount.
-    clearTimeoutSpy.mockClear();
-
     unmount();
 
-    expect(clearTimeoutSpy).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
 
-    // The timer for 'b' must not fire after unmount.
+  it('handles an initial undefined value and settles back to undefined', () => {
+    const { result, rerender } = renderHook(({ value }) => useDebouncedValue(value, 300), {
+      initialProps: { value: undefined as string | undefined },
+    });
+
+    expect(result.current).toBeUndefined();
+
+    rerender({ value: 'Hastings' });
     act(() => {
       vi.advanceTimersByTime(300);
     });
+    expect(result.current).toBe('Hastings');
+
+    rerender({ value: undefined });
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(result.current).toBeUndefined();
+  });
+
+  it('uses the new delay when delayMs changes without the value changing', () => {
+    // Changing value and delayMs in the same rerender would not catch a dependency
+    // array missing delayMs: the effect reruns anyway because value changed, and it
+    // captures whatever delayMs is current in that render's closure regardless of
+    // the dependency array. To isolate the delayMs dependency, change delayMs on a
+    // rerender where the value stays the same, so a stale effect (still running on
+    // the old timer, scheduled with the old delay) becomes observable.
+    const { result, rerender } = renderHook(({ value, delayMs }) => useDebouncedValue(value, delayMs), {
+      initialProps: { value: 'a', delayMs: 1000 },
+    });
+
+    rerender({ value: 'b', delayMs: 1000 });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(result.current).toBe('a'); // still mid-way through the original 1000ms wait
+
+    rerender({ value: 'b', delayMs: 100 });
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+    expect(result.current).toBe('b');
   });
 });
