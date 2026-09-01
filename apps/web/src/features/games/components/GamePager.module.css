@@ -1,0 +1,30 @@
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.step {
+  font: inherit;
+  font-size: 15px;
+  color: var(--text-h);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.step:hover:not(:disabled) {
+  border-color: var(--accent-border);
+}
+
+.step:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.position {
+  font-size: 14px;
+}
