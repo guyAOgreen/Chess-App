@@ -16,6 +16,11 @@ export interface UseReplay {
  * site, and the reported index is bounded by the current plies. The page also
  * keys the viewer by game id, so this is the second line of defence against a
  * stale index surviving a move to a shorter game — not the first.
+ *
+ * Precondition: `plies` must be non-empty. `replay` guarantees this by always
+ * prepending the initial position as ply 0, so this hook does not defend
+ * against an empty array itself — with none, `current` reports `plies.length -
+ * 1`, i.e. `-1`, an invalid index by construction rather than a manufactured 0.
  */
 export function useReplay(plies: Ply[]): UseReplay {
   const [current, setCurrent] = useState(0);
@@ -27,5 +32,5 @@ export function useReplay(plies: Ply[]): UseReplay {
     [plies.length],
   );
 
-  return { current: Math.min(current, Math.max(plies.length - 1, 0)), select };
+  return { current: Math.min(current, plies.length - 1), select };
 }

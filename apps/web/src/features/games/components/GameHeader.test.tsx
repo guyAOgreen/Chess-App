@@ -29,6 +29,20 @@ const SPARSE: Game = {
   result: 'UNFINISHED',
 };
 
+/**
+ * The value shown under a given `<dt>` label, read via its containing `<div>`
+ * rather than a bare `getByText` on the value. Metadata is rendered as several
+ * distinct strings; asserting only that a value is present anywhere in the
+ * document (or only counting em dashes) is satisfied by the right values under
+ * the wrong labels — e.g. Event and Site swapped. Scoping through the label
+ * pins each value to its own field.
+ */
+function fieldValue(label: string): string | null {
+  const dt = screen.getByText(label);
+  const container = dt.closest('div');
+  return container?.querySelector('dd')?.textContent ?? null;
+}
+
 describe('GameHeader', () => {
   it('names both players with their game-time ratings', () => {
     render(<GameHeader game={COMPLETE} />);
@@ -43,13 +57,29 @@ describe('GameHeader', () => {
     expect(screen.getByText('1-0')).toBeInTheDocument();
   });
 
-  it('shows the metadata that was recorded', () => {
+  it('exposes a clean accessible name for the heading, independent of its visual layout', () => {
+    // The heading renders three adjacent spans with no textual separator
+    // between them (the CSS gap is visual only), so its default accessible
+    // name is a run-on string. An explicit aria-label is what a screen reader
+    // actually announces.
     render(<GameHeader game={COMPLETE} />);
 
-    expect(screen.getByText(/World Championship/)).toBeInTheDocument();
-    expect(screen.getByText(/Dubai/)).toBeInTheDocument();
-    expect(screen.getByText('2021-12-03')).toBeInTheDocument();
-    expect(screen.getByText('C88')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2 })).toHaveAccessibleName(
+      'Carlsen, M (2839) versus Nepomniachtchi, I (2792), 1-0',
+    );
+  });
+
+  it('shows each piece of metadata against its own label, not just present somewhere', () => {
+    render(<GameHeader game={COMPLETE} />);
+
+    // Every field has a distinct, non-null value here, so a value rendered
+    // under the wrong label (e.g. Event and Site swapped) is caught.
+    expect(fieldValue('Event')).toBe('World Championship');
+    expect(fieldValue('Site')).toBe('Dubai');
+    expect(fieldValue('Round')).toBe('6');
+    expect(fieldValue('Date')).toBe('2021-12-03');
+    expect(fieldValue('ECO')).toBe('C88');
+    expect(fieldValue('Source')).toBe('PGN import');
   });
 
   it('renders absent metadata as an em dash rather than an empty gap', () => {

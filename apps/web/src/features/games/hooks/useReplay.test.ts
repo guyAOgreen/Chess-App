@@ -57,4 +57,30 @@ describe('useReplay', () => {
 
     expect(result.current.current).toBeLessThan(5);
   });
+
+  it('refuses a selection made after the plies list has shrunk, not just one made before', () => {
+    // `select` must recompute its bound against the current plies on every
+    // render, not close over the length that was current when it was first
+    // created. If it did, this select (39, valid for the original 40-length
+    // list) would be wrongly accepted after the rerender to 5, and the
+    // reported index would land on the clamp bound (4) rather than staying
+    // refused at the untouched initial value (0).
+    const { result, rerender } = renderHook(({ p }) => useReplay(p), {
+      initialProps: { p: plies(40) },
+    });
+
+    rerender({ p: plies(5) });
+    act(() => result.current.select(39));
+
+    expect(result.current.current).toBe(0);
+  });
+
+  it('reports an out-of-range index for an empty plies array, by contract rather than by accident', () => {
+    // `replay` always prepends the initial position, so an empty array never
+    // reaches this hook in practice. This pins the degenerate case explicitly
+    // rather than leaving it to whatever `Math.min` happens to produce.
+    const { result } = renderHook(() => useReplay([]));
+
+    expect(result.current.current).toBe(-1);
+  });
 });

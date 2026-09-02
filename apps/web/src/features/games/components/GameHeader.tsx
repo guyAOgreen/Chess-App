@@ -9,9 +9,16 @@ import type { Game } from '../types/game';
  * both places.
  */
 export function GameHeader({ game }: { game: Game }) {
+  // JSX strips the whitespace between the three spans, so without an explicit
+  // accessible name the heading's textContent runs the three together with no
+  // separation (e.g. "Green, G*Opp, O") — the `gap` in the CSS module is
+  // visual only and a screen reader never sees it. The spans stay for layout;
+  // this label is what assistive tech actually announces.
+  const heading = `${sideLabel(game.white)} versus ${sideLabel(game.black)}, ${resultLabel(game.result)}`;
+
   return (
     <header className={styles.header}>
-      <h2 className={styles.players}>
+      <h2 className={styles.players} aria-label={heading}>
         <span>{sideLabel(game.white)}</span>
         <span className={styles.result}>{resultLabel(game.result)}</span>
         <span>{sideLabel(game.black)}</span>
