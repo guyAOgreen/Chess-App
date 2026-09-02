@@ -6,13 +6,13 @@ import type { Ply } from './types/ply';
  * begins here. */
 export const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
-const INITIAL_PLY: Ply = {
+const INITIAL_PLY: Ply = Object.freeze({
   index: 0,
   moveNumber: 0,
   colour: null,
   san: null,
   fen: INITIAL_FEN,
-};
+});
 
 export interface Replayed {
   /** Never empty: index 0 is always the initial position. */
@@ -37,13 +37,11 @@ export interface Replayed {
  * anything chess.js considers non-strict is a divergence between it and chesslib,
  * and should surface as a visible error rather than a quietly wrong board.
  *
- * The trailing ` *` is appended to a local copy only. The backend needs exactly
- * this for chesslib — `ChesslibPgnParser` documents that chesslib parses movetext
- * only when the text ends in a result token — and it is harmless here whether or
- * not chess.js has the same requirement.
+ * Unlike chesslib on the backend, chess.js does not require a termination
+ * marker on the movetext, so none is appended here.
  *
- * Never throws: both `loadPgn` and `move()` raise on failure, and a viewer that
- * blanked on a bad game would be worse than one that says what went wrong.
+ * Never throws: `loadPgn` raises on failure, and a viewer that blanked on a bad
+ * game would be worse than one that says what went wrong.
  */
 export function replay(movetext: string): Replayed {
   if (movetext.trim() === '') {
@@ -52,7 +50,7 @@ export function replay(movetext: string): Replayed {
 
   const chess = new Chess();
   try {
-    chess.loadPgn(`${movetext} *`, { strict: true });
+    chess.loadPgn(movetext, { strict: true });
   } catch (error: unknown) {
     return { plies: [INITIAL_PLY], error: messageOf(error) };
   }

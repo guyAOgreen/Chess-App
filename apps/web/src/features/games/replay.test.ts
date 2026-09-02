@@ -96,4 +96,14 @@ describe('replay', () => {
 
     expect(error).toBeNull();
   });
+
+  it('still replays movetext that does carry a trailing result token', () => {
+    // The stored contract says this never happens, but replay must not choke
+    // on it if it ever did: chess.js parses it fine on its own, and appending
+    // a result token of our own would break exactly this case.
+    const { plies, error } = replay('1. e4 e5 1-0');
+
+    expect(error).toBeNull();
+    expect(plies).toHaveLength(3);
+  });
 });

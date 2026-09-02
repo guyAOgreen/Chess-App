@@ -506,6 +506,13 @@ for no current benefit.
 **A row's link is the only way in.** There is no search-by-id and no URL sharing
 affordance beyond copying the address bar.
 
+**`replay`'s FEN output is not byte-identical to chesslib's.** chess.js emits
+the en-passant target square only when the capture is legal, while the standard
+FEN convention chesslib follows records it after every double pawn push. Inert
+today because only the placement field is ever read. It would matter if
+position identity were ever computed on both sides of the wire —
+CONTEXT.md's position indexing for opponent preparation is the case to watch.
+
 ## Out of scope
 
 * **URL-synced list filters** — decision 5. Its own issue, unblocked by this one.
