@@ -289,7 +289,7 @@ apps/web/src/
 │   │   └── GameRow.tsx                + explicit viewer <Link> cell
 │   └── pages/
 │       └── GameViewerPage.tsx         + .module.css
-├── index.css                          + two board colour tokens
+├── index.css                          + board colour and ink tokens
 └── public/pieces/                     12 SVGs + LICENCE
 ```
 
