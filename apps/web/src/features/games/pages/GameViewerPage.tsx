@@ -5,6 +5,7 @@ import { Chessboard } from '../components/Chessboard';
 import { GameHeader } from '../components/GameHeader';
 import { MoveList } from '../components/MoveList';
 import { useGame } from '../hooks/useGame';
+import { useMoveKeys } from '../hooks/useMoveKeys';
 import { useReplay } from '../hooks/useReplay';
 import { replay } from '../replay';
 import type { Game } from '../types/game';
@@ -66,6 +67,8 @@ function GameViewer({ game }: { game: Game }) {
   const replayed = useMemo(() => replay(game.movetext), [game.movetext]);
   const { current, select } = useReplay(replayed.plies);
 
+  useMoveKeys({ current, count: replayed.plies.length, select });
+
   return (
     <article className={styles.viewer}>
       <GameHeader game={game} />
@@ -80,11 +83,17 @@ function GameViewer({ game }: { game: Game }) {
           <Chessboard fen={replayed.plies[0].fen} />
         </section>
       ) : (
-        <div className={styles.board}>
-          {/* useReplay bounds current to [0, plies.length), and plies is never empty. */}
-          <Chessboard fen={replayed.plies[current].fen} />
-          <MoveList plies={replayed.plies} current={current} onSelect={select} />
-        </div>
+        <>
+          <div className={styles.board}>
+            {/* useReplay bounds current to [0, plies.length), and plies is never empty. */}
+            <Chessboard fen={replayed.plies[current].fen} />
+            <MoveList plies={replayed.plies} current={current} onSelect={select} />
+          </div>
+          <p className={styles.hint}>
+            Use <kbd>←</kbd> and <kbd>→</kbd> to step through the moves, <kbd>Home</kbd> and{' '}
+            <kbd>End</kbd> to jump to either end.
+          </p>
+        </>
       )}
 
       <Link to="/">Back to games</Link>

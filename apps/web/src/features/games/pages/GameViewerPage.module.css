@@ -58,3 +58,19 @@
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
+
+.hint {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.hint kbd {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-h);
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+}

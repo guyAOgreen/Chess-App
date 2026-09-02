@@ -164,19 +164,30 @@ appear, whether the page number belongs in the URL, what Clear does to history �
 and folding it in would mix two unrelated user stories in one review. It gets its
 own issue, which this change unblocks by introducing the router.
 
-### 6. Navigation is clicking a move; no keyboard, no flip
+### 6. Navigation is clicking a move or the arrow keys; no flip
 
-The move list is the navigation. Clicking a ply shows that position. There are no
-Previous/Next buttons, no arrow-key handling and no board flip.
+The move list is the navigation, and the arrow keys drive the same selector:
+`ArrowLeft` and `ArrowRight` step a ply, `Home` and `End` jump to either end.
 
-The issue asks for "keyboard **or** click navigation", so this satisfies it, and
-stepping is not lost — consecutive plies sit next to each other in the list.
+This decision originally shipped click-only. Stepping one ply at a time is a
+viewer's core interaction, and doing it by clicking small text repeatedly is poor,
+so the keys were added once the viewer existed and could be used.
 
-Recorded honestly: arrow keys are about fifteen lines and stepping one ply at a
-time is a viewer's core interaction, so a user replaying a long game will be
-targeting small text repeatedly. That was raised and deliberately deferred. Board
-flipping is likewise deferred, which is why decision 7 drops the orientation prop
-rather than shipping one nothing sets.
+The handler listens on the document rather than on a focused element, so the keys
+work the moment the page loads. Requiring a click first makes the feature
+invisible — a user presses an arrow, nothing happens, and concludes it is not
+there. The cost of listening globally is that the handler must decline what is not
+its business: it ignores keys pressed inside a form control or an editable region,
+which matters for #17's correction inputs, and keys held with a modifier, which
+belong to the browser. `preventDefault` fires only for keys actually handled, so
+arrows still scroll and `Home`/`End` still jump everywhere else.
+
+No bounds checking lives in the handler. `useReplay.select` already refuses an
+out-of-range index, and duplicating that rule would give it a second place to
+drift from.
+
+Board flipping remains deferred, which is why decision 7 drops the orientation
+prop rather than shipping one nothing sets.
 
 ### 7. `Chessboard` takes a FEN and nothing else
 
@@ -280,6 +291,7 @@ apps/web/src/
 │   │   └── ply.ts                     + Ply
 │   ├── hooks/
 │   │   ├── useGame.ts                 one game's request state, incl. invalid ID and 404
+│   │   ├── useMoveKeys.ts             arrow/Home/End navigation, document-scoped
 │   │   └── useReplay.ts               plies, current index, select
 │   ├── components/
 │   │   ├── Chessboard.tsx             + .module.css
@@ -494,8 +506,8 @@ Any caller can view any game, because the endpoint permits it.
 
 ## Known limitations
 
-**No arrow keys and no board flip.** Decision 6, deliberate. Both are small
-follow-ups.
+**No board flip.** Decision 6, deliberate — a small follow-up. Reversing the
+square array is the whole change.
 
 **Variations, comments and NAGs are not shown.** The import parser uses them while
 validating submitted PGN but, as ADR 0002 specifies, removes them from canonical
@@ -534,7 +546,7 @@ where inspecting one specific square matters most.
 ## Out of scope
 
 * **URL-synced list filters** — decision 5. Its own issue, unblocked by this one.
-* **Arrow-key navigation and board flipping** — decision 6.
+* **Board flipping** — decision 6.
 * **Engine analysis.** CONTEXT.md anticipates Stockfish eventually; nothing here
   assumes it.
 * **Move annotations, variations, comments** — not stored in canonical

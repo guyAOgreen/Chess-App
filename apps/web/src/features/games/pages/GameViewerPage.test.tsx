@@ -76,6 +76,48 @@ describe('GameViewerPage', () => {
     expect(screen.getByRole('button', { name: 'e4' })).toHaveAttribute('aria-current', 'true');
   });
 
+  it('steps through the moves with the arrow keys', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(A_GAME)));
+
+    renderAt(ID);
+    await screen.findByRole('group', { name: /position/i });
+
+    await userEvent.keyboard('{ArrowRight}');
+    expect(screen.getByLabelText('e4, white pawn')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'e4' })).toHaveAttribute('aria-current', 'true');
+
+    await userEvent.keyboard('{ArrowLeft}');
+    expect(screen.getByLabelText('e2, white pawn')).toBeInTheDocument();
+  });
+
+  it('goes nowhere pressing back from the initial position', async () => {
+    // useReplay refuses the out-of-range index, so the key handler needs no
+    // bounds check of its own.
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(A_GAME)));
+
+    renderAt(ID);
+    await screen.findByRole('group', { name: /position/i });
+
+    await userEvent.keyboard('{ArrowLeft}');
+
+    expect(screen.getByLabelText('e2, white pawn')).toBeInTheDocument();
+  });
+
+  it('jumps to the final position and back to the start', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(A_GAME)));
+
+    renderAt(ID);
+    await screen.findByRole('group', { name: /position/i });
+
+    await userEvent.keyboard('{End}');
+    // A_GAME ends 3. Bb5, so the bishop stands on b5 and e2 is long vacated.
+    expect(screen.getByLabelText('b5, white bishop')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Bb5' })).toHaveAttribute('aria-current', 'true');
+
+    await userEvent.keyboard('{Home}');
+    expect(screen.getByLabelText('e2, white pawn')).toBeInTheDocument();
+  });
+
   it('says the game is not here, and offers no retry for it', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 404)));
 
