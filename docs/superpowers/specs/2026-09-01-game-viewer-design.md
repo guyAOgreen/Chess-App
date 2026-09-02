@@ -98,13 +98,13 @@ so anything chess.js considers non-strict is a divergence between the two librar
 and should surface as decision 9's visible error rather than as a silently
 mis-rendered board.
 
-`replay` appends a local ` *` before calling `loadPgn`. The precedent is on the
-backend and documented: `ChesslibPgnParser` appends `*` to a **local copy** because
-"chesslib only parses a game's movetext during iteration when the source text ends
-with one of the four PGN result tokens". Whether chess.js has the same requirement
-is **unverified** — appending is harmless either way, since ` *` is valid PGN and
-the result is never read back from the copy. The implementation should establish
-which it is, and the test list carries a case for movetext with no terminator.
+chesslib on the backend genuinely requires a terminal result token to parse a
+movetext at all: `ChesslibPgnParser` documents appending `*` to a **local copy**
+because "chesslib only parses a game's movetext during iteration when the source
+text ends with one of the four PGN result tokens". chess.js has no such
+requirement, and `replay` does not append one — doing so is actively harmful
+rather than harmless, since movetext that already carries a result token then
+parses as two terminators and is rejected outright.
 
 ### 3. A hand-rolled board, not `react-chessboard`
 
@@ -401,9 +401,10 @@ Where the weight sits, and it needs no React at all:
   establish the real shape from a stored game rather than assuming, and pin it, so
   that a chesslib upgrade changing the formatting fails here rather than in the
   browser;
-* movetext with no terminal token, which is what the API returns, confirming
-  whether the ` *` decision 2 appends is load-bearing for chess.js or merely
-  harmless;
+* movetext with no terminal token, which is what the API returns, parses
+  without error;
+* movetext that does carry a trailing result token still parses, guarding
+  against ever reintroducing a locally-appended terminator that would reject it;
 * empty movetext yields exactly the initial position;
 * unparseable movetext returns `plies` holding only the initial position **and** an
   error, and does not throw;
