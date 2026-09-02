@@ -136,4 +136,74 @@ describe('useGame', () => {
     }
     expect(result.current.state.game.event).toBe('Wijk aan Zee');
   });
+
+  it('aborts the in-flight request when the id changes', async () => {
+    // The mechanism the superseded-response test relies on: without a real
+    // `abort()` call in the effect's cleanup, there is no signal for the
+    // hook to check, and that test would be relying on nothing.
+    const abortSpy = vi.fn();
+    const fetchStub = vi.fn().mockImplementation((_path: string, init: { signal: AbortSignal }) => {
+      init.signal.addEventListener('abort', abortSpy);
+      return new Promise(() => {
+        // Never settles: only whether `abort` fired matters here.
+      });
+    });
+    vi.stubGlobal('fetch', fetchStub);
+
+    const other = '22222222-2222-2222-2222-222222222222';
+    const { rerender } = renderHook(({ id }) => useGame(id), {
+      initialProps: { id: ID },
+    });
+    await waitFor(() => expect(fetchStub).toHaveBeenCalledTimes(1));
+
+    rerender({ id: other });
+    await waitFor(() => expect(fetchStub).toHaveBeenCalledTimes(2));
+
+    expect(abortSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not report an aborted request as a failure', async () => {
+    // Deliberately does not unmount. Unmounting tears down the render tree,
+    // so a setState call the hook makes afterwards is discarded by React
+    // regardless of whether the guard the hook is supposed to have is
+    // present — which would make the assertion pass whether or not the
+    // guard exists, proving nothing. Staying mounted and rerendering with a
+    // new id keeps the component alive and able to re-render, so if the
+    // superseded request's rejection is (wrongly) treated as a failure,
+    // that state change is actually observable here.
+    const fetchStub = vi
+      .fn()
+      .mockImplementationOnce(
+        (_path: string, init: { signal: AbortSignal }) =>
+          new Promise((_resolve, reject) => {
+            init.signal.addEventListener('abort', () =>
+              reject(new DOMException('Aborted', 'AbortError')),
+            );
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise(() => {
+            // The second (current) request is left unresolved on purpose: if
+            // the first request's abort were mishandled as a failure, that
+            // would be visible before this one ever answers.
+          }),
+      );
+    vi.stubGlobal('fetch', fetchStub);
+
+    const other = '22222222-2222-2222-2222-222222222222';
+    const { result, rerender } = renderHook(({ id }) => useGame(id), {
+      initialProps: { id: ID },
+    });
+    await waitFor(() => expect(fetchStub).toHaveBeenCalledTimes(1));
+
+    rerender({ id: other });
+    await waitFor(() => expect(fetchStub).toHaveBeenCalledTimes(2));
+
+    // Let the aborted first request's rejection (and its `.catch`) run.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(result.current.state.kind).toBe('loading');
+  });
 });

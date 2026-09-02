@@ -35,30 +35,32 @@ const CANONICAL_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f
 export function useGame(id: string | undefined): UseGame {
   const valid = id !== undefined && CANONICAL_UUID.test(id);
   const path = valid ? gamePath(id) : null;
-  const [state, setState] = useState<GameState>(valid ? { kind: 'loading' } : { kind: 'invalid-id' });
+  // Holds only the request arms. `invalid-id` is never stored here — it is a
+  // pure function of `path` and is derived below, not tracked as separate
+  // state that could disagree with the id currently in hand.
+  const [fetched, setFetched] = useState<GameState>({ kind: 'loading' });
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (path === null) {
-      // oxlint-disable-next-line react/set-state-in-effect -- the request's outcome is not derivable during render
-      setState({ kind: 'invalid-id' });
       return;
     }
 
     const controller = new AbortController();
-    setState((current) => (current.kind === 'loading' ? current : { kind: 'loading' }));
+    // oxlint-disable-next-line react/set-state-in-effect -- whether to reset to loading depends on the previously settled fetch state, which is not derivable during render
+    setFetched((current) => (current.kind === 'loading' ? current : { kind: 'loading' }));
 
     fetchGame(path, controller.signal)
       .then((game) => {
         if (!controller.signal.aborted) {
-          setState({ kind: 'ready', game });
+          setFetched({ kind: 'ready', game });
         }
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) {
           return;
         }
-        setState(
+        setFetched(
           error instanceof GameNotFound
             ? { kind: 'not-found' }
             : { kind: 'failed', message: messageOf(error) },
@@ -67,6 +69,8 @@ export function useGame(id: string | undefined): UseGame {
 
     return () => controller.abort();
   }, [path, attempt]);
+
+  const state: GameState = path === null ? { kind: 'invalid-id' } : fetched;
 
   const retry = useCallback(() => setAttempt((previous) => previous + 1), []);
 
