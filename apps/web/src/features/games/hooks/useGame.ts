@@ -37,8 +37,10 @@ export function useGame(id: string | undefined): UseGame {
   const path = valid ? gamePath(id) : null;
   // Holds only the request arms. `invalid-id` is never stored here — it is a
   // pure function of `path` and is derived below, not tracked as separate
-  // state that could disagree with the id currently in hand.
-  const [fetched, setFetched] = useState<GameState>({ kind: 'loading' });
+  // state that could disagree with the id currently in hand. The type says so.
+  const [fetched, setFetched] = useState<Exclude<GameState, { kind: 'invalid-id' }>>({
+    kind: 'loading',
+  });
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {

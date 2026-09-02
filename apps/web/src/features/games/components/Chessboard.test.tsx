@@ -61,6 +61,20 @@ describe('Chessboard', () => {
     expect(screen.queryAllByRole('img')).toHaveLength(0);
   });
 
+  it('hides the coordinate captions from assistive tech', () => {
+    // On an empty board every a-file and rank-1 square carries a caption and
+    // no aria-label to override it. Without aria-hidden a screen reader would
+    // read those as stray floating letters and digits.
+    const { container } = render(<Chessboard fen={EMPTY} />);
+
+    const captions = container.querySelectorAll('span');
+    // 8 file letters (rank 1) + 8 rank digits (file a), a1 contributing one of each.
+    expect(captions).toHaveLength(16);
+    for (const caption of captions) {
+      expect(caption).toHaveAttribute('aria-hidden', 'true');
+    }
+  });
+
   it('has an accessible name identifying it as the position', () => {
     render(<Chessboard fen={START} />);
 
@@ -73,16 +87,31 @@ describe('Chessboard', () => {
     expect(screen.getByText(/could not be read/i)).toBeInTheDocument();
   });
 
-  it('points each square at its own piece image', () => {
+  it('points every one of the twelve piece kinds at its own image', () => {
+    // One square per kind, all from the starting position. Sampling only two
+    // kinds (as this test used to) would miss a localised swap between two
+    // other piece filenames, such as black knight and black bishop.
+    const expected = [
+      { label: 'a8, black rook', src: '/pieces/br.svg' },
+      { label: 'b8, black knight', src: '/pieces/bn.svg' },
+      { label: 'c8, black bishop', src: '/pieces/bb.svg' },
+      { label: 'd8, black queen', src: '/pieces/bq.svg' },
+      { label: 'e8, black king', src: '/pieces/bk.svg' },
+      { label: 'a7, black pawn', src: '/pieces/bp.svg' },
+      { label: 'a1, white rook', src: '/pieces/wr.svg' },
+      { label: 'b1, white knight', src: '/pieces/wn.svg' },
+      { label: 'c1, white bishop', src: '/pieces/wb.svg' },
+      { label: 'd1, white queen', src: '/pieces/wq.svg' },
+      { label: 'e1, white king', src: '/pieces/wk.svg' },
+      { label: 'a2, white pawn', src: '/pieces/wp.svg' },
+    ];
+    expect(expected).toHaveLength(12);
+
     const { container } = render(<Chessboard fen={START} />);
-    expect(container.querySelector('[aria-label="a1, white rook"] img')).toHaveAttribute(
-      'src',
-      '/pieces/wr.svg',
-    );
-    expect(container.querySelector('[aria-label="e8, black king"] img')).toHaveAttribute(
-      'src',
-      '/pieces/bk.svg',
-    );
+
+    for (const { label, src } of expected) {
+      expect(container.querySelector(`[aria-label="${label}"] img`)).toHaveAttribute('src', src);
+    }
     expect(container.querySelectorAll('img')).toHaveLength(32);
   });
 });

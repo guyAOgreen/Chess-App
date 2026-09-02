@@ -49,6 +49,7 @@ export function GameViewerPage() {
         <button type="button" onClick={retry}>
           Retry
         </button>
+        <Link to="/">Back to games</Link>
       </section>
     );
   }

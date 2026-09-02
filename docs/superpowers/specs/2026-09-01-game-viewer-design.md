@@ -269,16 +269,21 @@ virtualise, and any structure that implied otherwise would be inventing a proble
 ```text
 apps/web/src/
 ├── app/
-│   └── App.tsx                        routes; shell around both pages
+│   ├── App.tsx                        routes; shell around both pages
+│   └── HomePage.tsx                   the list plus backend health, routed at /
 ├── features/games/
 │   ├── replay.ts                      PURE: movetext → Replayed. Only chess.js importer
+│   ├── format.ts                      + spokenResultLabel, viewLinkLabel
 │   ├── api/games.ts                   + gamePath(id), fetchGame(path, signal)
-│   ├── types/game.ts                  + Game, Ply
+│   ├── types/
+│   │   ├── game.ts                    + Game
+│   │   └── ply.ts                     + Ply
 │   ├── hooks/
 │   │   ├── useGame.ts                 one game's request state, incl. invalid ID and 404
 │   │   └── useReplay.ts               plies, current index, select
 │   ├── components/
 │   │   ├── Chessboard.tsx             + .module.css
+│   │   ├── squares.ts                 PURE: FEN placement → 64 squares
 │   │   ├── MoveList.tsx               + .module.css
 │   │   ├── GameHeader.tsx             + .module.css
 │   │   └── GameRow.tsx                + explicit viewer <Link> cell
@@ -473,10 +478,12 @@ decision 9 exists to prevent. This is a test, not a comment.
 
 **The movetext contract.** `CanonicalPgn` appends the result token *separately*
 from the movetext, so what the API returns is moves only, with no `1-0` to strip.
-`replay` constructs a local PGN fragment by appending ` *` before calling
-`loadPgn`, because the stored result is irrelevant to position reconstruction and
-some PGN readers require a termination marker. This is not input repair: the
-domain and database contract forbid a terminal result token in stored movetext.
+chesslib on the backend genuinely requires a terminal result token to parse a
+movetext at all — `ChesslibPgnParser` appends `*` to a local copy for exactly
+that reason. chess.js has no such requirement, and `replay` does not append one:
+doing so would be actively harmful rather than harmless, since movetext that
+already carries a result token would then parse as two terminators and be
+rejected outright.
 
 **Vendored assets are unversioned.** Twelve SVGs enter the repository with no
 build step verifying they are what the licence file claims. The `LICENCE` file

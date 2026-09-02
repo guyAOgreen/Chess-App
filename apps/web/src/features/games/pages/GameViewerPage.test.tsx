@@ -110,6 +110,8 @@ describe('GameViewerPage', () => {
     renderAt(ID);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/failed to fetch/i);
+    // A failed request is still a dead end with a way out, same as the other two.
+    expect(screen.getByRole('link', { name: /games/i })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: /retry/i }));
 
