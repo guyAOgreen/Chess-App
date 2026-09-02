@@ -193,19 +193,24 @@ describe('fetchGame', () => {
 
     const failure = fetchGame('/api/games/x');
     await expect(failure).rejects.not.toBeInstanceOf(GameNotFound);
+    await expect(failure).rejects.toBeInstanceOf(GamesRequestFailed);
     await expect(failure).rejects.toThrow(/\(400\)/);
   });
 
   it('fails when the response is not JSON', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(nonJsonResponse(502)));
 
-    await expect(fetchGame('/api/games/x')).rejects.toThrow(/502/);
+    const failure = fetchGame('/api/games/x');
+    await expect(failure).rejects.toBeInstanceOf(GamesRequestFailed);
+    await expect(failure).rejects.toThrow(/502/);
   });
 
   it('fails, keeping the transport message, when the backend cannot be reached', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
 
-    await expect(fetchGame('/api/games/x')).rejects.toThrow(/Failed to fetch/);
+    const failure = fetchGame('/api/games/x');
+    await expect(failure).rejects.toBeInstanceOf(GamesRequestFailed);
+    await expect(failure).rejects.toThrow(/Failed to fetch/);
   });
 
   it('passes the abort signal through', async () => {
