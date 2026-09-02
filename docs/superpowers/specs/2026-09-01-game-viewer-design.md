@@ -78,20 +78,33 @@ The consequence worth having: the hardest part of this feature is a pure functio
 Testing "the FEN after 12 plies of the Ruy Lopez" needs no React, no DOM, no
 network and no mocking — just an input string and an expected string.
 
-**It parses with `loadPgn`, not by tokenising SAN itself.** Stored movetext is not
-a plain list of moves. `PgnMoveCounter` on the backend shows what it may legally
-contain: brace comments, `;` comments running to end of line, recursive
-variations, NAGs, suffix annotations like `!?`, and move numbers attached to their
-move (`1.e4`, `2...Nc6`). Splitting on whitespace and stripping digits would
-mangle every one of those.
+**It parses with `loadPgn`, not by tokenising SAN itself.** Canonical movetext is
+clean SAN with move numbers, and it is clean because the backend *regenerates* it
+rather than storing what was submitted: `ValidatedMoves.of` builds it from
+`MoveList.toSanWithMoveNumbers()` after replaying every move against
+`Board.legalMoves()`, and its own javadoc calls the field "normalised SAN with move
+numbers, trimmed". Comments, variations, NAGs and suffix annotations exist in the
+submitted document, which is why `PgnMoveCounter` strips them to count what was
+*submitted* — they never reach storage.
 
-Reproducing that stripping on the frontend would mean duplicating
-`PgnMoveCounter`'s logic — including the detail its javadoc flags, that a `;`
-comment ends at its line, "which is what the specification says and precisely
-where chesslib disagrees". Duplicating tricky chess-text parsing across two
-languages is what CLAUDE.md warns against, and there is no need: `loadPgn` already
-does it. So `replay` loads the movetext and reads the resulting history, and the
-only text handling we own is none.
+It is still a grammar rather than a whitespace-delimited list: move numbers may sit
+adjacent to their move and SAN carries disambiguation, captures, promotion,
+castling and check markers. `replay` calls `loadPgn` in strict mode and maps the
+verbose main-line history to `Ply` values using each move's `after` FEN. It does
+not parse or replay individual SAN tokens itself.
+
+Strict mode is the deliberate choice: the input is machine-generated canonical SAN,
+so anything chess.js considers non-strict is a divergence between the two libraries
+and should surface as decision 9's visible error rather than as a silently
+mis-rendered board.
+
+`replay` appends a local ` *` before calling `loadPgn`. The precedent is on the
+backend and documented: `ChesslibPgnParser` appends `*` to a **local copy** because
+"chesslib only parses a game's movetext during iteration when the source text ends
+with one of the four PGN result tokens". Whether chess.js has the same requirement
+is **unverified** — appending is harmless either way, since ` *` is valid PGN and
+the result is never read back from the copy. The implementation should establish
+which it is, and the test list carries a case for movetext with no terminator.
 
 ### 3. A hand-rolled board, not `react-chessboard`
 
@@ -126,14 +139,23 @@ consequences for the whole application; choosing BSD has none.
 
 ### 5. `react-router`, with `/` and `/games/:id`
 
-`react-router@8`, MIT, whose peer requirement (`react >= 19.2.7`) the repository
-already satisfies.
+`react-router@8`, MIT. Its peer requirement is `react >= 19.2.7` and the repository
+is on `^19.2.8`, so it is already satisfied; the resolved version is pinned by
+`yarn.lock` rather than left to a transitive upgrade.
 
 #10 refused a router when there was one screen, on the grounds that "a router
 earns its place when there is a second URL to route to". There is now. The routes
-are `/` for the list and `/games/:id` for the viewer, and `GameRow` becomes a
-`<Link>` — the one-file change #10 designed for by extracting the row as its own
-component.
+are `/` for the list and `/games/:id` for the viewer. `GameRow` remains a semantic
+`<tr>` — a link cannot validly wrap or replace a table row. A final "View" column
+contains a `<Link>` to the game, giving every row one explicit,
+keyboard-accessible navigation target without duplicating a link in every cell.
+`GameTable` gains the matching column heading.
+
+The router uses browser history. Development is covered by Vite's SPA fallback;
+any production static host must likewise rewrite unknown application paths such
+as `/games/{id}` to `index.html` while leaving `/api/*` to the backend. Without
+that deployment rule, in-app navigation works but refreshing or opening a shared
+viewer URL returns the host's 404.
 
 **URL-synced list filters are not part of this.** #10 recorded that filters do not
 survive a reload or the back button, and expected this issue to pick it up. It is
@@ -169,8 +191,11 @@ That matters for #17 specifically: a half-recognised scoresheet may not yet be a
 legal game, and a component that insisted on a validated `Game` would be unusable
 there. A component that takes a position renders whatever position it is given.
 
-`MoveList` follows the same rule — plies, a current index, and a callback. #17
-attaches recognition confidence to its plies without changing this contract.
+`MoveList` follows the same rule — plies, a current index, and a callback. It is
+decoupled from loading and chess.js, but this spec does not claim that its exact
+props already model #17's recognition confidence or correction controls. That
+screen may extend the presentation contract or compose those controls around the
+list while continuing to reuse the board and replay-independent ply model.
 
 No `orientation` prop, because decision 6 dropped flipping and nothing would set
 it. Reversing the square array is a small change when something wants it.
@@ -180,12 +205,24 @@ it. Reversing the square array is a small change when something wants it.
 `GET /api/games/{id}` answers 404 for an identifier that parses but matches no
 game — #9 chose that deliberately, and chose 400 for one that does not parse at
 all, so that "the request was malformed" and "the game is not here" stay
-distinguishable.
+distinguishable. `useGame` validates the route parameter as a UUID before making a
+request and exposes `invalid-id` for a malformed value; retrying a URL that cannot
+possibly succeed would be misleading.
 
-The viewer preserves that distinction. "No game with that identifier", with a link
-back to the list, is a different sentence from "the request failed", and only one
-of them is worth offering a Retry for. Collapsing them would discard information
-the backend went to trouble to provide.
+One divergence to accept knowingly. #9's javadoc records that `UUID.fromString` is
+lenient — it accepts non-canonical dash-separated forms and widens each group, so
+`/api/games/1-1-1-1-1` parses and comes back 404 rather than 400, and #9 left that
+alone deliberately. A strict client-side check is therefore *stricter* than the
+server: `/games/1-1-1-1-1` shows `invalid-id` here where the backend would have
+said "not found". Both answers tell the user the same actionable thing — that
+identifier will not open a game — so the divergence costs nothing, but it should be
+a deliberate choice rather than a surprise, and the client must not be relied on as
+the definition of a valid identifier.
+
+The viewer preserves those distinctions. `invalid-id` and `not-found` each show a
+specific message and a link back to the list. A transport or unexpected server
+failure shows Retry. If the server nevertheless returns 400 for a locally valid
+UUID, it is an unexpected rejected request and remains `failed`.
 
 ### 9. An unreplayable game degrades rather than blanks
 
@@ -204,8 +241,7 @@ and "blank screen" are different outcomes, and there is a named way for it to
 happen: chess.js and chesslib are different implementations, and
 [#37](https://github.com/guyAOgreen/Chess-App/issues/37) exists because chesslib's
 reader already mishandles documents that are legal PGN. A disagreement in the
-other direction is no less plausible, and decision 2 names a specific candidate —
-the two disagree about where a `;` comment ends.
+other direction is no less plausible.
 
 **The degradation is all-or-nothing, not a partial replay.** `loadPgn` throws on a
 parse failure and offers no partial mode, so there is no "replayed as far as ply
@@ -239,13 +275,13 @@ apps/web/src/
 │   ├── api/games.ts                   + gamePath(id), fetchGame(path, signal)
 │   ├── types/game.ts                  + Game, Ply
 │   ├── hooks/
-│   │   ├── useGame.ts                 one game's request state, incl. 404
+│   │   ├── useGame.ts                 one game's request state, incl. invalid ID and 404
 │   │   └── useReplay.ts               plies, current index, select
 │   ├── components/
 │   │   ├── Chessboard.tsx             + .module.css
 │   │   ├── MoveList.tsx               + .module.css
 │   │   ├── GameHeader.tsx             + .module.css
-│   │   └── GameRow.tsx                becomes a <Link>
+│   │   └── GameRow.tsx                + explicit viewer <Link> cell
 │   └── pages/
 │       └── GameViewerPage.tsx         + .module.css
 ├── index.css                          + two board colour tokens
@@ -286,7 +322,7 @@ has no honest value before the first move, and every consumer needs an
         ▼
     useGame ─────▶ GET /api/games/{id} ─────▶ Game { …, movetext }
         │                                      │
-        │  loading / ready / not-found / failed│
+        │  loading / ready / invalid-id / not-found / failed
         ▼                                      ▼
    GameViewerPage                      replay(movetext)   ← pure, chess.js, useMemo
         │                                      │
@@ -301,10 +337,14 @@ has no honest value before the first move, and every consumer needs an
 
 `useGame` reuses the request-state shape #10 settled — a discriminated union with
 an `AbortController` and a `retry` — so both pages behave identically when the
-backend is unreachable. It adds one arm for the 404 (decision 8).
+backend is unreachable. It adds arms for an invalid route identifier and a 404
+(decision 8).
 
 `useReplay` holds only the current index and derives everything else. It takes
-`plies` rather than movetext, so it never touches chess.js either.
+`plies` rather than movetext, so it never touches chess.js either. When the route
+changes to another successfully loaded game, the ready viewer is keyed by game ID
+so selection resets to the initial position; a stale index from the previous game
+must never select or index past the new game's plies.
 
 ## Rendering detail
 
@@ -315,9 +355,11 @@ colours, defined in both colour schemes like every other token — the board is 
 first thing in this application needing colours the current palette does not have.
 Files a–h and ranks 1–8 label the edge squares.
 
-Each piece is an `<img>` with an `alt` naming it ("white knight"), so the position
-is not purely visual. A square with no piece has no image and no alt text — 64
-announcements of "empty" would be worse than none.
+The board has an accessible name that identifies it as the current chess
+position. Each occupied square exposes a label containing both coordinate and
+piece (for example, "e4, white pawn"), rather than repetitions of "white pawn"
+with no location. Empty squares are not individually announced. Coordinate labels
+remain visible and are not the accessible name's only source.
 
 **The move list.** Rows of move number, White's move, Black's move — the shape a
 scoresheet has, which is not incidental: #17 puts a scoresheet image beside this
@@ -336,6 +378,7 @@ list.
 |---|---|
 | `loading` | "Loading game…" |
 | `ready` | Header, board, move list |
+| `invalid-id` | "That game identifier is invalid." and a link to the list |
 | `not-found` | "No game with that identifier." and a link to the list |
 | `failed` | The failure message and Retry |
 | `ready`, replay failed | Header, the stored movetext as plain text, the starting position, and the error |
@@ -354,12 +397,13 @@ Where the weight sits, and it needs no React at all:
   replay, kept as tests even though a library does the work, because they are what
   a library swap would have to survive;
 * SAN disambiguation (`Nbd7`);
-* **the annotations movetext may legally carry** — a brace comment, a `;` comment,
-  a NAG, a suffix annotation (`e4!?`), a recursive variation, and a move number
-  attached to its move (`1.e4`, `2...Nc6`). Each must replay to the same positions
-  as the same game written plainly. These are the cases decision 2 chose `loadPgn`
-  for, so they are the tests that would fail if someone "simplified" it to a split
-  on whitespace;
+* canonical SAN formatting as `MoveList.toSanWithMoveNumbers()` actually emits it —
+  establish the real shape from a stored game rather than assuming, and pin it, so
+  that a chesslib upgrade changing the formatting fails here rather than in the
+  browser;
+* movetext with no terminal token, which is what the API returns, confirming
+  whether the ` *` decision 2 appends is load-bearing for chess.js or merely
+  harmless;
 * empty movetext yields exactly the initial position;
 * unparseable movetext returns `plies` holding only the initial position **and** an
   error, and does not throw;
@@ -368,7 +412,9 @@ Where the weight sits, and it needs no React at all:
 ### `Chessboard.test.tsx`
 
 The starting FEN places a white rook on a1 and a black king on e8; the empty-board
-FEN renders 64 squares and no pieces; each piece image has an alt text naming it.
+FEN renders 64 squares and no pieces; an occupied square's accessible label names
+both its coordinate and piece; malformed FEN fails predictably rather than
+silently drawing a shifted or incomplete board.
 
 ### `MoveList.test.tsx`
 
@@ -377,14 +423,15 @@ a ply raises its index; the initial-position entry is selectable.
 
 ### `useGame.test.ts`
 
-Loading then ready; a superseded request never lands (the abort discipline #10
-established); a 404 produces `not-found` rather than `failed`; a transport failure
-produces `failed`; `retry` re-requests.
+Invalid UUID makes no request; loading then ready; a superseded request never lands
+(the abort discipline #10 established); a 404 produces `not-found` rather than
+`failed`; a transport failure produces `failed`; `retry` re-requests.
 
 ### `useReplay.test.ts`
 
 Starts at the initial position; `select` moves the index; an out-of-range index is
-refused rather than producing an undefined FEN.
+refused rather than producing an undefined FEN; loading a different game resets
+selection to the initial position.
 
 ### `GameViewerPage.test.tsx`
 
@@ -395,6 +442,14 @@ failure states.
 ### `App.test.tsx`
 
 A row in the list links to `/games/:id`, and that route renders the viewer.
+
+### An existing test this change breaks
+
+#10's `GameTable.test.tsx` asserts nine column headers, in order, each carrying
+`scope="col"` — a test added precisely because swapping two headers had previously
+survived the suite. Decision 5 adds a tenth column, so that assertion must be
+updated rather than deleted, and the View column needs the same `scope="col"`
+treatment as the other nine.
 
 ### Not tested
 
@@ -415,17 +470,12 @@ exception if the PGN fails to parse") raise on failure. So `replay` must catch, 
 a `replay` that let the exception escape would blank the page — exactly what
 decision 9 exists to prevent. This is a test, not a comment.
 
-**The two libraries disagree about `;` comments.** `PgnMoveCounter`'s javadoc
-records that a `;` comment ends at its line "which is what the specification says
-and precisely where chesslib disagrees" — so the backend hand-rolls that rule
-rather than trusting its own library. chess.js is a third implementation of the
-same rule. A game whose movetext carries a `;` comment is therefore the most likely
-candidate for a genuine disagreement, and has a named test.
-
 **The movetext contract.** `CanonicalPgn` appends the result token *separately*
 from the movetext, so what the API returns is moves only, with no `1-0` to strip.
-`replay` should not assume a terminal token can never appear, since a future
-importer could change that, but it should not strip one speculatively either.
+`replay` constructs a local PGN fragment by appending ` *` before calling
+`loadPgn`, because the stored result is irrelevant to position reconstruction and
+some PGN readers require a termination marker. This is not input repair: the
+domain and database contract forbid a terminal result token in stored movetext.
 
 **Vendored assets are unversioned.** Twelve SVGs enter the repository with no
 build step verifying they are what the licence file claims. The `LICENCE` file
@@ -439,13 +489,11 @@ Any caller can view any game, because the endpoint permits it.
 **No arrow keys and no board flip.** Decision 6, deliberate. Both are small
 follow-ups.
 
-**Variations, comments and NAGs are stored but not shown.** Movetext may contain
-all three — `PgnMoveCounter` exists precisely because it may — and the viewer
-renders only the main line, because that is what `loadPgn` yields as history.
-A game imported with annotations displays its moves and silently drops the
-commentary. Nothing is lost from storage; it is simply not surfaced. Showing it
-means designing how a variation reads in a move list, which is a feature, not an
-oversight to correct here.
+**Variations, comments and NAGs are not shown.** The import parser uses them while
+validating submitted PGN but, as ADR 0002 specifies, removes them from canonical
+`movetext`; the original annotated document remains available only as provenance
+in `sourcePgn`. Displaying annotations requires first modelling an annotated game
+representation rather than asking the viewer to infer one from canonical moves.
 
 **The whole game is replayed on load.** Fine for a chess game — a long one is a
 few hundred plies. It would not be fine for a database dump, which is not what
@@ -464,7 +512,8 @@ affordance beyond copying the address bar.
 * **Arrow-key navigation and board flipping** — decision 6.
 * **Engine analysis.** CONTEXT.md anticipates Stockfish eventually; nothing here
   assumes it.
-* **Move annotations, variations, comments** — not stored.
+* **Move annotations, variations, comments** — not stored in canonical
+  `movetext`; the submitted source document is retained as provenance.
 * **PGN export.** `GameResponse` deliberately carries neither `sourcePgn` nor an
   assembled document; export is a distinct representation, decided when something
   needs it.
