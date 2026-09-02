@@ -82,3 +82,33 @@ export interface GamesQuery extends GameFilterValues {
   colour?: GameColour;
   page: number;
 }
+
+/**
+ * The detail representation, returned by `GET /api/games/{id}`: a summary plus
+ * the moves. Mirrors the backend's `GameResponse`, which is `GameSummaryResponse`
+ * with `movetext` added.
+ *
+ * `movetext` is normalised SAN with move numbers — the backend regenerates it
+ * from the parsed move list rather than storing what was submitted, so it carries
+ * no tag pairs, no terminal result token, and no comments, variations or NAGs.
+ */
+export interface Game extends GameSummary {
+  movetext: string;
+}
+
+/**
+ * One position in a replayed game.
+ *
+ * Index 0 is the initial position and is always present, which is why the
+ * remaining fields are nullable. Without it there is no honest value for "which
+ * ply is selected" before the first move, and every consumer needs a branch for
+ * it.
+ */
+export interface Ply {
+  index: number;
+  /** 1-based; 0 for the initial position. */
+  moveNumber: number;
+  colour: 'white' | 'black' | null;
+  san: string | null;
+  fen: string;
+}
