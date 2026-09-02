@@ -35,16 +35,17 @@
   font-size: 10px;
 }
 
-/* Each label takes the opposite square's colour, not its own — opacity over
-   the label's own square is what made it near-invisible in dark mode. */
+/* Ink chosen for contrast against the square, not borrowed from the board's
+   own mid-tone palette — opacity over the label's own square, and then a
+   mid-tone-on-mid-tone swap, are both what previously destroyed the ratio. */
 .light .file,
 .light .rank {
-  color: var(--board-dark);
+  color: var(--board-ink-dark);
 }
 
 .dark .file,
 .dark .rank {
-  color: var(--board-light);
+  color: var(--board-ink-light);
 }
 
 .file {
