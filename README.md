@@ -44,6 +44,14 @@ The frontend proxies `/api` and `/actuator` to the backend, so no CORS
 configuration is needed in development. The home page reports the backend's
 health, which is the quickest check that all three pieces are talking.
 
+The frontend also uses browser (not hash) routing for its own paths, such as
+`/games/{id}`. Vite's dev server already rewrites unknown application paths
+to `index.html`, but a static host serving the production build must be
+configured to do the same — while still leaving `/api/*` (and `/actuator/*`)
+to the backend. Without that rewrite rule, in-app navigation works, but
+refreshing or sharing a viewer URL returns the host's own 404 instead of the
+app.
+
 The backend reads its datasource from `SPRING_DATASOURCE_URL`,
 `SPRING_DATASOURCE_USERNAME` and `SPRING_DATASOURCE_PASSWORD`, defaulting to the
 compose values, so no environment setup is needed for local work.

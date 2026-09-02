@@ -203,4 +203,34 @@ describe('GameTable', () => {
     );
     expect(screen.getByRole('link', { name: /Green, G/ })).toHaveAttribute('href', '/games/2');
   });
+
+  it('gives the link an accessible name starting with the visible "View" text', () => {
+    // Voice control matches the visible label ("click View"); a name that put
+    // the players first would silently break that.
+    render(
+      <MemoryRouter>
+        <GameTable games={[COMPLETE]} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('link', { name: /Carlsen, M/ })).toHaveAccessibleName(/^View /);
+  });
+
+  it("disambiguates a repeated pairing's link with the date, and never reads a dash when there is none", () => {
+    // COMPLETE has a recorded date; SPARSE does not. Two rows named only by
+    // their players would be indistinguishable in a links list — the real
+    // shape this page most often takes against one opponent.
+    render(
+      <MemoryRouter>
+        <GameTable games={[COMPLETE, SPARSE]} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('link', { name: /Carlsen, M/ })).toHaveAccessibleName(
+      'View Carlsen, M versus Nepomniachtchi, I, 2021-12-03',
+    );
+    const undated = screen.getByRole('link', { name: /Green, G/ });
+    expect(undated).toHaveAccessibleName('View Green, G versus Opponent, O');
+    expect(undated.getAttribute('aria-label')).not.toContain('—');
+  });
 });

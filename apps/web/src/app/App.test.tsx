@@ -40,4 +40,34 @@ describe('App', () => {
     expect(await screen.findByRole('alert')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /^games$/i })).not.toBeInTheDocument();
   });
+
+  it('polls the backend health at the root', async () => {
+    const fetchStub = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+    vi.stubGlobal('fetch', fetchStub);
+
+    render(<App />);
+
+    // Both the games list and the health card fetch on mount; wait for the
+    // health card's own failure state so its fetch has definitely landed.
+    await screen.findByText(/backend unreachable/i);
+
+    const urls = fetchStub.mock.calls.map((call) => call[0] as string);
+    expect(urls.some((url) => url.includes('actuator'))).toBe(true);
+  });
+
+  it('does not poll the backend health when viewing a game', async () => {
+    // Health lives in HomePage, not App, precisely so opening a game does not
+    // also poll Actuator on every open. If health ever moved back to App
+    // (or the card into a route both pages share outside <Routes>), this
+    // would start firing on every viewer visit.
+    const fetchStub = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+    vi.stubGlobal('fetch', fetchStub);
+    window.history.pushState({}, '', '/games/11111111-1111-1111-1111-111111111111');
+
+    render(<App />);
+    await screen.findByRole('alert');
+
+    const urls = fetchStub.mock.calls.map((call) => call[0] as string);
+    expect(urls.some((url) => url.includes('actuator'))).toBe(false);
+  });
 });

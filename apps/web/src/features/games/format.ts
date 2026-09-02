@@ -63,3 +63,20 @@ export function sideLabel(side: GameSide): string {
 export function orDash(value: string | null): string {
   return value ?? EM_DASH;
 }
+
+/**
+ * The accessible name for a row's link into the viewer.
+ *
+ * Starts with the visible link text ("View") so a voice-control user saying
+ * "click View" still lands on it — reordering the pairing ahead of "View"
+ * would silently break that.
+ *
+ * Names both sides, because a table of one opponent's games gives every row
+ * the same two names; the date is appended, when recorded, to tell those
+ * rows apart the way a player would — not `orDash`'s em dash, which is a
+ * visual "not recorded" marker and pure noise spoken aloud.
+ */
+export function viewLinkLabel(white: string, black: string, playedOn: string | null): string {
+  const pairing = `View ${white} versus ${black}`;
+  return playedOn === null ? pairing : `${pairing}, ${playedOn}`;
+}

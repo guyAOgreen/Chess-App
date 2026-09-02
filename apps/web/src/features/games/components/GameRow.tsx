@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { orDash, resultLabel, sideLabel, sourceLabel } from '../format';
+import { orDash, resultLabel, sideLabel, sourceLabel, viewLinkLabel } from '../format';
 import type { GameSummary } from '../types/game';
 
 /**
@@ -10,7 +10,9 @@ import type { GameSummary } from '../types/game';
  * keyboard user a single stop rather than a link in every cell.
  *
  * The accessible name names the game, because a screen reader listing links
- * would otherwise read "View" once per row.
+ * would otherwise read "View" once per row — and, via `viewLinkLabel`, the
+ * date too, because a repeated pairing (the same two players, several
+ * rounds) would otherwise give several rows the identical name.
  */
 export function GameRow({ game }: { game: GameSummary }) {
   return (
@@ -27,7 +29,7 @@ export function GameRow({ game }: { game: GameSummary }) {
       <td>
         <Link
           to={`/games/${game.id}`}
-          aria-label={`View ${game.white.name} versus ${game.black.name}`}
+          aria-label={viewLinkLabel(game.white.name, game.black.name, game.playedOn)}
         >
           View
         </Link>
