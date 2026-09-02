@@ -1,0 +1,63 @@
+.board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  width: min(480px, 100%);
+  aspect-ratio: 1;
+  border: 1px solid var(--border);
+}
+
+.light,
+.dark {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.light {
+  background: var(--board-light);
+}
+
+.dark {
+  background: var(--board-dark);
+}
+
+.light img,
+.dark img {
+  width: 100%;
+  height: 100%;
+}
+
+.file,
+.rank {
+  position: absolute;
+  font-size: 10px;
+}
+
+/* Ink chosen for contrast against the square, not borrowed from the board's
+   own mid-tone palette — opacity over the label's own square, and then a
+   mid-tone-on-mid-tone swap, are both what previously destroyed the ratio. */
+.light .file,
+.light .rank {
+  color: var(--board-ink-dark);
+}
+
+.dark .file,
+.dark .rank {
+  color: var(--board-ink-light);
+}
+
+.file {
+  right: 2px;
+  bottom: 0;
+}
+
+.rank {
+  left: 2px;
+  top: 0;
+}
+
+.unreadable {
+  color: var(--text);
+}

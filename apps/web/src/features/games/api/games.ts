@@ -1,5 +1,5 @@
 import { getJson, queryString } from '../../../lib/api';
-import type { GamePage, GamesQuery } from '../types/game';
+import type { Game, GamePage, GamesQuery } from '../types/game';
 
 /** A request that did not produce a page, whatever the reason. The page shows the
  * message; there is nothing else it can usefully do with the distinction, and #43
@@ -34,6 +34,39 @@ export async function fetchGames(path: string, signal?: AbortSignal): Promise<Ga
     case 'body':
       if (response.ok) {
         return response.data;
+      }
+      throw new GamesRequestFailed(`The server rejected the request (${response.status}).`);
+    case 'invalid-body':
+      throw new GamesRequestFailed(
+        `The server answered ${response.status} with something that is not JSON.`,
+      );
+    case 'unreachable':
+      throw new GamesRequestFailed(`Could not reach the server (${response.message}).`);
+  }
+}
+
+/**
+ * A game that is not here. Distinct from `GamesRequestFailed` because the backend
+ * went to trouble to distinguish them: #9 answers 404 for an identifier that
+ * parses but matches no game, and 400 for one that does not parse. Only one of
+ * those is worth offering a Retry for.
+ */
+export class GameNotFound extends Error {}
+
+export function gamePath(id: string): string {
+  return `/api/games/${encodeURIComponent(id)}`;
+}
+
+export async function fetchGame(path: string, signal?: AbortSignal): Promise<Game> {
+  const response = await getJson<Game>(path, { signal });
+
+  switch (response.kind) {
+    case 'body':
+      if (response.ok) {
+        return response.data;
+      }
+      if (response.status === 404) {
+        throw new GameNotFound('No game with that identifier.');
       }
       throw new GamesRequestFailed(`The server rejected the request (${response.status}).`);
     case 'invalid-body':

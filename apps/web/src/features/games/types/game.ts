@@ -82,3 +82,16 @@ export interface GamesQuery extends GameFilterValues {
   colour?: GameColour;
   page: number;
 }
+
+/**
+ * The detail representation, returned by `GET /api/games/{id}`: a summary plus
+ * the moves. Mirrors the backend's `GameResponse`, which is `GameSummaryResponse`
+ * with `movetext` added.
+ *
+ * `movetext` is normalised SAN with move numbers — the backend regenerates it
+ * from the parsed move list rather than storing what was submitted, so it carries
+ * no tag pairs, no terminal result token, and no comments, variations or NAGs.
+ */
+export interface Game extends GameSummary {
+  movetext: string;
+}

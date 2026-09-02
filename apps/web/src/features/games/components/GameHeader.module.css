@@ -1,0 +1,33 @@
+.header {
+  margin-bottom: 16px;
+}
+
+.players {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0 0 8px;
+}
+
+.result {
+  color: var(--text);
+  font-family: var(--mono);
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 0;
+  font-size: 14px;
+}
+
+.meta dt {
+  color: var(--text);
+}
+
+.meta dd {
+  margin: 0;
+  color: var(--text-h);
+}

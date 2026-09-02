@@ -19,6 +19,21 @@ const RESULT_LABELS: Record<GameResult, string> = {
   UNFINISHED: '*',
 };
 
+/**
+ * The spoken form of a result, for use in an `aria-label` rather than on
+ * screen. `resultLabel`'s visual tokens are exactly right to read — `1-0`,
+ * `½-½`, `*` — but they are not what they sound like: a screen reader either
+ * skips a bare `*` or says "star", and reads `½-½` as "one half one half" or
+ * "vulgar fraction one half". This exists so the two can legitimately
+ * diverge without either one compromising for the other.
+ */
+const SPOKEN_RESULT_LABELS: Record<GameResult, string> = {
+  WHITE_WON: 'White won',
+  BLACK_WON: 'Black won',
+  DRAW: 'Draw',
+  UNFINISHED: 'Unfinished',
+};
+
 const SOURCE_LABELS: Record<GameSource, string> = {
   PERSONAL: 'Personal',
   CLUB: 'Club',
@@ -33,6 +48,10 @@ export function resultLabel(result: GameResult): string {
   return RESULT_LABELS[result];
 }
 
+export function spokenResultLabel(result: GameResult): string {
+  return SPOKEN_RESULT_LABELS[result];
+}
+
 export function sourceLabel(source: GameSource): string {
   return SOURCE_LABELS[source];
 }
@@ -43,4 +62,21 @@ export function sideLabel(side: GameSide): string {
 
 export function orDash(value: string | null): string {
   return value ?? EM_DASH;
+}
+
+/**
+ * The accessible name for a row's link into the viewer.
+ *
+ * Starts with the visible link text ("View") so a voice-control user saying
+ * "click View" still lands on it — reordering the pairing ahead of "View"
+ * would silently break that.
+ *
+ * Names both sides, because a table of one opponent's games gives every row
+ * the same two names; the date is appended, when recorded, to tell those
+ * rows apart the way a player would — not `orDash`'s em dash, which is a
+ * visual "not recorded" marker and pure noise spoken aloud.
+ */
+export function viewLinkLabel(white: string, black: string, playedOn: string | null): string {
+  const pairing = `View ${white} versus ${black}`;
+  return playedOn === null ? pairing : `${pairing}, ${playedOn}`;
 }

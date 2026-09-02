@@ -1,0 +1,62 @@
+.moves {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  max-height: min(480px, 100vh);
+  overflow-y: auto;
+}
+
+.table {
+  border-collapse: collapse;
+  font-size: 15px;
+  text-align: left;
+}
+
+.caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.number {
+  padding: 2px 8px 2px 0;
+  color: var(--text);
+  font-weight: 400;
+  text-align: right;
+}
+
+.move,
+.start {
+  font: inherit;
+  font-size: 15px;
+  color: var(--text-h);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.move:hover,
+.start:hover {
+  border-color: var(--border);
+}
+
+.move:focus-visible,
+.start:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.move[aria-current='true'],
+.start[aria-current='true'] {
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+}

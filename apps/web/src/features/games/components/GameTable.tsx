@@ -23,6 +23,7 @@ export function GameTable({ games }: { games: GameSummary[] }) {
           <th scope="col">Round</th>
           <th scope="col">ECO</th>
           <th scope="col">Source</th>
+          <th scope="col">View</th>
         </tr>
       </thead>
       <tbody>

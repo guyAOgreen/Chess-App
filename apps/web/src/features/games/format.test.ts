@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { orDash, resultLabel, sideLabel, sourceLabel } from './format';
+import { orDash, resultLabel, sideLabel, sourceLabel, spokenResultLabel, viewLinkLabel } from './format';
 import { GAME_RESULTS, GAME_SOURCES } from './types/game';
 
 describe('resultLabel', () => {
@@ -21,6 +21,18 @@ describe('resultLabel', () => {
       expect(label).toBeTruthy();
       expect(label).not.toBe(result);
     }
+  });
+});
+
+describe('spokenResultLabel', () => {
+  it('renders the spoken form, distinct from the visual token', () => {
+    // Every value pinned explicitly, not a loop over truthiness: this project
+    // has been bitten by a loop that would pass with two labels swapped, or
+    // with a spoken label that just echoes the visual one back unread.
+    expect(spokenResultLabel('WHITE_WON')).toBe('White won');
+    expect(spokenResultLabel('BLACK_WON')).toBe('Black won');
+    expect(spokenResultLabel('DRAW')).toBe('Draw');
+    expect(spokenResultLabel('UNFINISHED')).toBe('Unfinished');
   });
 });
 
@@ -64,5 +76,32 @@ describe('orDash', () => {
     // setting EM_DASH to '' would still pass.
     expect(orDash(null)).toBe('—');
     expect(orDash('Hastings')).toBe('Hastings');
+  });
+});
+
+describe('viewLinkLabel', () => {
+  it('starts with the visible link text, so voice control matching "View" still works', () => {
+    // A plausible "less verbose" edit reorders this to the names first — that
+    // would silently break voice control, so the start of the string is
+    // asserted explicitly rather than just checking the names are present.
+    expect(viewLinkLabel('Carlsen, M', 'Nepomniachtchi, I', null)).toMatch(/^View /);
+  });
+
+  it('names both sides when no date is recorded', () => {
+    expect(viewLinkLabel('Carlsen, M', 'Nepomniachtchi, I', null)).toBe(
+      'View Carlsen, M versus Nepomniachtchi, I',
+    );
+  });
+
+  it('appends the date when one is recorded, to tell repeated pairings apart', () => {
+    // Two rounds of the same match-up otherwise share one accessible name,
+    // returning the link list to the ambiguity the label exists to fix.
+    expect(viewLinkLabel('Carlsen, M', 'Nepomniachtchi, I', '2021-12-03')).toBe(
+      'View Carlsen, M versus Nepomniachtchi, I, 2021-12-03',
+    );
+  });
+
+  it('never reads an em dash for a missing date — silence, not noise, in a spoken name', () => {
+    expect(viewLinkLabel('Carlsen, M', 'Nepomniachtchi, I', null)).not.toContain('—');
   });
 });
