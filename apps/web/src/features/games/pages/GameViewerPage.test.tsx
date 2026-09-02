@@ -73,6 +73,7 @@ describe('GameViewerPage', () => {
 
     expect(screen.getByLabelText('e4, white pawn')).toBeInTheDocument();
     expect(screen.queryByLabelText('e2, white pawn')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'e4' })).toHaveAttribute('aria-current', 'true');
   });
 
   it('says the game is not here, and offers no retry for it', async () => {
@@ -95,6 +96,8 @@ describe('GameViewerPage', () => {
     expect(fetchStub).not.toHaveBeenCalled();
     // Retrying an unparsable identifier cannot succeed, so it offers none.
     expect(screen.queryByRole('button', { name: /retry/i })).not.toBeInTheDocument();
+    // A malformed URL is still a dead end with a way out.
+    expect(screen.getByRole('link', { name: /games/i })).toBeInTheDocument();
   });
 
   it('offers a retry when the request failed, and recovers', async () => {

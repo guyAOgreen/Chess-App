@@ -44,8 +44,8 @@ export function GameViewerPage() {
 
   if (state.kind === 'failed') {
     return (
-      <section className={styles.problem} role="alert">
-        <p>{state.message}</p>
+      <section className={styles.problem}>
+        <p role="alert">{state.message}</p>
         <button type="button" onClick={retry}>
           Retry
         </button>
@@ -75,10 +75,12 @@ function GameViewer({ game }: { game: Game }) {
             <p>These moves could not be replayed: {replayed.error}</p>
           </div>
           <pre className={styles.movetext}>{game.movetext}</pre>
+          {/* replay() guarantees plies is never empty, so index 0 is always defined. */}
           <Chessboard fen={replayed.plies[0].fen} />
         </section>
       ) : (
         <div className={styles.board}>
+          {/* useReplay bounds current to [0, plies.length), and plies is never empty. */}
           <Chessboard fen={replayed.plies[current].fen} />
           <MoveList plies={replayed.plies} current={current} onSelect={select} />
         </div>

@@ -1,6 +1,7 @@
 .board {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
   width: min(480px, 100%);
   aspect-ratio: 1;
   border: 1px solid var(--border);
