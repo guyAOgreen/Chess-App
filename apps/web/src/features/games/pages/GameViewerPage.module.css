@@ -1,0 +1,60 @@
+.viewer {
+  padding: 24px 0;
+  text-align: left;
+}
+
+.board {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.unreplayable {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.movetext {
+  font-family: var(--mono);
+  font-size: 14px;
+  white-space: pre-wrap;
+  padding: 12px;
+  background: var(--code-bg);
+  border-radius: 4px;
+  margin: 0;
+}
+
+.problem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--accent-border);
+  border-radius: 4px;
+  background: var(--accent-bg);
+}
+
+.problem button {
+  font: inherit;
+  font-size: 15px;
+  color: var(--text-h);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.problem button:hover {
+  border-color: var(--accent-border);
+}
+
+.problem button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
