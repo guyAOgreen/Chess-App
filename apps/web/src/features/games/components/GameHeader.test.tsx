@@ -65,7 +65,17 @@ describe('GameHeader', () => {
     render(<GameHeader game={COMPLETE} />);
 
     expect(screen.getByRole('heading', { level: 2 })).toHaveAccessibleName(
-      'Carlsen, M (2839) versus Nepomniachtchi, I (2792), 1-0',
+      'Carlsen, M (2839) versus Nepomniachtchi, I (2792), White won',
+    );
+  });
+
+  it('speaks an unfinished result as a word, not the bare "*" a screen reader cannot render', () => {
+    // The visible span still shows resultLabel's '*' — this only pins the
+    // accessible name, which must use spokenResultLabel instead.
+    render(<GameHeader game={SPARSE} />);
+
+    expect(screen.getByRole('heading', { level: 2 })).toHaveAccessibleName(
+      'Green, G versus Opponent, O, Unfinished',
     );
   });
 

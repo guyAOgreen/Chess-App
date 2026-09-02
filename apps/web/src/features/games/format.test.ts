@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { orDash, resultLabel, sideLabel, sourceLabel } from './format';
+import { orDash, resultLabel, sideLabel, sourceLabel, spokenResultLabel } from './format';
 import { GAME_RESULTS, GAME_SOURCES } from './types/game';
 
 describe('resultLabel', () => {
@@ -21,6 +21,18 @@ describe('resultLabel', () => {
       expect(label).toBeTruthy();
       expect(label).not.toBe(result);
     }
+  });
+});
+
+describe('spokenResultLabel', () => {
+  it('renders the spoken form, distinct from the visual token', () => {
+    // Every value pinned explicitly, not a loop over truthiness: this project
+    // has been bitten by a loop that would pass with two labels swapped, or
+    // with a spoken label that just echoes the visual one back unread.
+    expect(spokenResultLabel('WHITE_WON')).toBe('White won');
+    expect(spokenResultLabel('BLACK_WON')).toBe('Black won');
+    expect(spokenResultLabel('DRAW')).toBe('Draw');
+    expect(spokenResultLabel('UNFINISHED')).toBe('Unfinished');
   });
 });
 

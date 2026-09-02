@@ -19,6 +19,21 @@ const RESULT_LABELS: Record<GameResult, string> = {
   UNFINISHED: '*',
 };
 
+/**
+ * The spoken form of a result, for use in an `aria-label` rather than on
+ * screen. `resultLabel`'s visual tokens are exactly right to read — `1-0`,
+ * `½-½`, `*` — but they are not what they sound like: a screen reader either
+ * skips a bare `*` or says "star", and reads `½-½` as "one half one half" or
+ * "vulgar fraction one half". This exists so the two can legitimately
+ * diverge without either one compromising for the other.
+ */
+const SPOKEN_RESULT_LABELS: Record<GameResult, string> = {
+  WHITE_WON: 'White won',
+  BLACK_WON: 'Black won',
+  DRAW: 'Draw',
+  UNFINISHED: 'Unfinished',
+};
+
 const SOURCE_LABELS: Record<GameSource, string> = {
   PERSONAL: 'Personal',
   CLUB: 'Club',
@@ -31,6 +46,10 @@ const SOURCE_LABELS: Record<GameSource, string> = {
 
 export function resultLabel(result: GameResult): string {
   return RESULT_LABELS[result];
+}
+
+export function spokenResultLabel(result: GameResult): string {
+  return SPOKEN_RESULT_LABELS[result];
 }
 
 export function sourceLabel(source: GameSource): string {
