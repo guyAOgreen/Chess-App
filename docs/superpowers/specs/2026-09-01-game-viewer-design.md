@@ -514,6 +514,16 @@ today because only the placement field is ever read. It would matter if
 position identity were ever computed on both sides of the wire —
 CONTEXT.md's position indexing for opponent preparation is the case to watch.
 
+**The board is a flat list of 32 labelled cells, not a navigable grid.**
+Because every label carries its coordinate, the position is fully recoverable —
+but only by listening to all thirty-two announcements in reading order. There
+is no way to ask what is on a given square, no keyboard navigation, and empty
+squares are silent, so a listener cannot distinguish an empty square from one
+they skipped. This is a deliberate limit for a read-only viewer. `role="grid"`
+with a roving tabindex and labels on empty squares is the upgrade path —
+worth noting that #17 will hand this component half-recognised positions,
+where inspecting one specific square matters most.
+
 ## Out of scope
 
 * **URL-synced list filters** — decision 5. Its own issue, unblocked by this one.

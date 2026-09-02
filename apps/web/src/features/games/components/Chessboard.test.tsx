@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { Chessboard, squaresOf } from './Chessboard';
+import { Chessboard } from './Chessboard';
+import { squaresOf } from './squares';
 
 const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 const EMPTY = '8/8/8/8/8/8/8/8 w - - 0 1';
@@ -70,5 +71,18 @@ describe('Chessboard', () => {
     render(<Chessboard fen="not-a-fen" />);
 
     expect(screen.getByText(/could not be read/i)).toBeInTheDocument();
+  });
+
+  it('points each square at its own piece image', () => {
+    const { container } = render(<Chessboard fen={START} />);
+    expect(container.querySelector('[aria-label="a1, white rook"] img')).toHaveAttribute(
+      'src',
+      '/pieces/wr.svg',
+    );
+    expect(container.querySelector('[aria-label="e8, black king"] img')).toHaveAttribute(
+      'src',
+      '/pieces/bk.svg',
+    );
+    expect(container.querySelectorAll('img')).toHaveLength(32);
   });
 });
