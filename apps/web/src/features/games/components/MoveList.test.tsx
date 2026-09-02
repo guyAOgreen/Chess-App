@@ -14,6 +14,19 @@ const PLIES: Ply[] = [
   { index: 5, moveNumber: 3, colour: 'white', san: 'Bb5', fen: 'f5' },
 ];
 
+/**
+ * A game where the same SAN occurs twice — both sides play `dxe5`, which the
+ * Opera Game does at plies 7 and 10. Real games repeat notation often, so a
+ * move must be identified by its ply index and never by its text.
+ */
+const REPEATED_SAN: Ply[] = [
+  { index: 0, moveNumber: 0, colour: null, san: null, fen: 'initial' },
+  { index: 1, moveNumber: 1, colour: 'white', san: 'dxe5', fen: 'f1' },
+  { index: 2, moveNumber: 1, colour: 'black', san: 'Bxf3', fen: 'f2' },
+  { index: 3, moveNumber: 2, colour: 'white', san: 'Qxf3', fen: 'f3' },
+  { index: 4, moveNumber: 2, colour: 'black', san: 'dxe5', fen: 'f4' },
+];
+
 describe('MoveList', () => {
   it('pairs the moves by move number, white before black', () => {
     render(<MoveList plies={PLIES} current={0} onSelect={vi.fn()} />);
@@ -23,6 +36,28 @@ describe('MoveList', () => {
     const cells = within(rows[0]).getAllByRole('cell');
     expect(within(cells[0]).getByRole('button', { name: 'e4' })).toBeInTheDocument();
     expect(within(cells[1]).getByRole('button', { name: 'e5' })).toBeInTheDocument();
+  });
+
+  it('selects a repeated move by its ply, not by its notation', async () => {
+    // Both sides play dxe5 here. Selecting on text would send the later one's
+    // click to the earlier ply and show the wrong position.
+    const onSelect = vi.fn();
+    render(<MoveList plies={REPEATED_SAN} current={0} onSelect={onSelect} />);
+
+    const both = screen.getAllByRole('button', { name: 'dxe5' });
+    expect(both).toHaveLength(2);
+
+    await userEvent.click(both[1]);
+
+    expect(onSelect).toHaveBeenCalledExactlyOnceWith(4);
+  });
+
+  it('marks only the repeated move that is current', () => {
+    render(<MoveList plies={REPEATED_SAN} current={4} onSelect={vi.fn()} />);
+
+    const both = screen.getAllByRole('button', { name: 'dxe5' });
+    expect(both[0]).not.toHaveAttribute('aria-current');
+    expect(both[1]).toHaveAttribute('aria-current', 'true');
   });
 
   it('leaves the black cell empty when the game ends on a white move', () => {

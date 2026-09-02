@@ -90,6 +90,37 @@ describe('GameViewerPage', () => {
     expect(screen.getByLabelText('e2, white pawn')).toBeInTheDocument();
   });
 
+  it('carries on with the arrows from a move that was clicked', async () => {
+    // The realistic flow: click into the middle of the game, then step. The
+    // keys read the selection the click made, not the one the page loaded with.
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(A_GAME)));
+
+    renderAt(ID);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Nf3' }));
+    expect(screen.getByRole('button', { name: 'Nf3' })).toHaveAttribute('aria-current', 'true');
+
+    await userEvent.keyboard('{ArrowRight}');
+    expect(screen.getByRole('button', { name: 'Nc6' })).toHaveAttribute('aria-current', 'true');
+
+    await userEvent.keyboard('{ArrowLeft}');
+    expect(screen.getByRole('button', { name: 'Nf3' })).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('keeps stepping when the arrows are pressed repeatedly', async () => {
+    // A single press cannot catch an effect bound to a stale index: the first
+    // press works and every later one repeats it.
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(A_GAME)));
+
+    renderAt(ID);
+    await screen.findByRole('group', { name: /position/i });
+
+    await userEvent.keyboard('{ArrowRight}{ArrowRight}{ArrowRight}');
+
+    expect(screen.getByRole('button', { name: 'Nf3' })).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByRole('button', { name: 'e4' })).not.toHaveAttribute('aria-current');
+  });
+
   it('goes nowhere pressing back from the initial position', async () => {
     // useReplay refuses the out-of-range index, so the key handler needs no
     // bounds check of its own.
