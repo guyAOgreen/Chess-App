@@ -31,7 +31,7 @@ function rowsOf(plies: Ply[]): MoveRow[] {
     rows.set(ply.moveNumber, row);
   }
 
-  return [...rows.values()];
+  return [...rows.values()].sort((a, b) => a.moveNumber - b.moveNumber);
 }
 
 export interface MoveListProps {
