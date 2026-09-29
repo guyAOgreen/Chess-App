@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef } from 'react';
 import styles from './MoveList.module.css';
+import { scrollOffsetFor } from './moveScroll';
 import type { Ply } from '../types/ply';
 
 /** The selected move. The same attribute the highlight's CSS keys off, so the
@@ -56,13 +57,21 @@ export function MoveList({ plies, current, onSelect }: MoveListProps) {
 
   // The list has its own max-height and scrolls independently of the board, so a
   // selection made with the keyboard can land outside the visible window — the
-  // board would move while the highlight stayed where it was. `block: 'nearest'`
-  // scrolls the list only as far as needed, never the page, and does nothing at
-  // all when the move is already visible, which is why a click needs no special
-  // case. A layout effect rather than an effect, so the scroll happens before
-  // paint instead of as a visible jump.
+  // board would move while the highlight stayed where it was.
+  //
+  // Only this container's own scrollTop is touched. `scrollIntoView` would be
+  // shorter but it scrolls every scrollable ancestor including the document, and
+  // its `block` option picks the alignment within each rather than which one
+  // moves — so on the stacked layout it would push the board out of view to
+  // bring a late move in. A layout effect rather than an effect, so the scroll
+  // lands before paint instead of as a visible jump.
   useLayoutEffect(() => {
-    listRef.current?.querySelector(CURRENT_MOVE)?.scrollIntoView({ block: 'nearest' });
+    const list = listRef.current;
+    const move = list?.querySelector(CURRENT_MOVE);
+    if (list === null || move === null || move === undefined) {
+      return;
+    }
+    list.scrollTop += scrollOffsetFor(list.getBoundingClientRect(), move.getBoundingClientRect());
   }, [current]);
 
   return (

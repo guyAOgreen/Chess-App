@@ -27,6 +27,22 @@ const REPEATED_SAN: Ply[] = [
   { index: 4, moveNumber: 2, colour: 'black', san: 'dxe5', fen: 'f4' },
 ];
 
+/** jsdom reports every rect as zero, so a test that cares about geometry must
+ * supply it. Only the vertical band matters here. */
+function stubBand(element: Element, top: number, bottom: number) {
+  vi.spyOn(element, 'getBoundingClientRect').mockReturnValue({
+    top,
+    bottom,
+    height: bottom - top,
+    left: 0,
+    right: 0,
+    width: 0,
+    x: 0,
+    y: top,
+    toJSON: () => ({}),
+  } satisfies DOMRect);
+}
+
 describe('MoveList', () => {
   it('pairs the moves by move number, white before black', () => {
     render(<MoveList plies={PLIES} current={0} onSelect={vi.fn()} />);
@@ -134,31 +150,55 @@ describe('MoveList', () => {
     expect(screen.getByRole('button', { name: 'e4' })).toHaveClass(styles.move);
   });
 
-  it('brings the newly selected move into view inside its own scroll container', () => {
-    // The list has its own max-height and scrolls independently of the board, so
-    // a selection made by keyboard can land outside the visible window.
-    const { rerender } = render(<MoveList plies={PLIES} current={0} onSelect={vi.fn()} />);
+  it('scrolls its own container by exactly enough to reveal the selected move', () => {
+    const { container, rerender } = render(
+      <MoveList plies={PLIES} current={0} onSelect={vi.fn()} />,
+    );
+    const list = container.firstElementChild as HTMLElement;
     const target = screen.getByRole('button', { name: 'Bb5' });
-    const other = screen.getByRole('button', { name: 'e4' });
-    const targetScroll = vi.spyOn(target, 'scrollIntoView');
-    const otherScroll = vi.spyOn(other, 'scrollIntoView');
+    // jsdom performs no layout, so the geometry has to be supplied.
+    stubBand(list, 100, 580);
+    stubBand(target, 586, 610);
 
     rerender(<MoveList plies={PLIES} current={5} onSelect={vi.fn()} />);
 
-    // 'nearest' scrolls the list only as far as needed and never the page, and
-    // does nothing at all when the move is already visible.
-    expect(targetScroll).toHaveBeenCalledExactlyOnceWith({ block: 'nearest' });
-    expect(otherScroll).not.toHaveBeenCalled();
+    // 30px below the bottom edge, so the list moves 30px and stops.
+    expect(list.scrollTop).toBe(30);
   });
 
-  it('brings the initial position into view when the selection returns to it', () => {
-    const { rerender } = render(<MoveList plies={PLIES} current={5} onSelect={vi.fn()} />);
-    const start = screen.getByRole('button', { name: /start/i });
-    const startScroll = vi.spyOn(start, 'scrollIntoView');
+  it('leaves its own scroll position alone when the move is already visible', () => {
+    const { container, rerender } = render(
+      <MoveList plies={PLIES} current={0} onSelect={vi.fn()} />,
+    );
+    const list = container.firstElementChild as HTMLElement;
+    const target = screen.getByRole('button', { name: 'Bb5' });
+    stubBand(list, 100, 580);
+    stubBand(target, 200, 224);
 
-    rerender(<MoveList plies={PLIES} current={0} onSelect={vi.fn()} />);
+    rerender(<MoveList plies={PLIES} current={5} onSelect={vi.fn()} />);
 
-    expect(startScroll).toHaveBeenCalledExactlyOnceWith({ block: 'nearest' });
+    expect(list.scrollTop).toBe(0);
+  });
+
+  it('never asks the browser to scroll anything but its own container', () => {
+    // `scrollIntoView` scrolls every scrollable ancestor including the document,
+    // which on the stacked layout would push the board out of view to bring a
+    // late move in. Reaching for it again is the regression to catch.
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    try {
+      const { container, rerender } = render(
+        <MoveList plies={PLIES} current={0} onSelect={vi.fn()} />,
+      );
+      stubBand(container.firstElementChild as HTMLElement, 100, 580);
+      stubBand(screen.getByRole('button', { name: 'Bb5' }), 586, 610);
+
+      rerender(<MoveList plies={PLIES} current={5} onSelect={vi.fn()} />);
+
+      expect(scrollIntoView).not.toHaveBeenCalled();
+    } finally {
+      Reflect.deleteProperty(Element.prototype, 'scrollIntoView');
+    }
   });
 
   it('gives the table an accessible name', () => {
