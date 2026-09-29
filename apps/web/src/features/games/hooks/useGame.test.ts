@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useGame } from './useGame';
 import type { Game } from '../types/game';
@@ -97,6 +97,80 @@ describe('useGame', () => {
     result.current.retry();
 
     await waitFor(() => expect(result.current.state.kind).toBe('ready'));
+  });
+
+  it("never renders one game's data under another game's id", async () => {
+    // The stale frame is a committed render, not a final value, so the whole
+    // sequence has to be recorded — checking result.current afterwards would
+    // read the state the effect has already corrected.
+    const other = '22222222-2222-2222-2222-222222222222';
+    const pending = new Promise<Response>(() => {
+      // never settles: B stays in flight for the whole test
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValueOnce(jsonResponse(A_GAME)).mockReturnValueOnce(pending),
+    );
+
+    const seen: string[] = [];
+    const { rerender } = renderHook(
+      ({ id }) => {
+        const { state } = useGame(id);
+        seen.push(state.kind === 'ready' ? `ready:${state.game.id}` : state.kind);
+        return state;
+      },
+      { initialProps: { id: ID } },
+    );
+    await waitFor(() => expect(seen).toContain(`ready:${ID}`));
+
+    const before = seen.length;
+    rerender({ id: other });
+
+    // Every render committed under B's id must be pending, not A's game.
+    expect(seen.slice(before)).not.toContain(`ready:${ID}`);
+    expect(seen.slice(before).every((kind) => kind === 'loading')).toBe(true);
+  });
+
+  it('shows loading while a retry of the same game is in flight', async () => {
+    // Pressing Retry should replace the failure with a spinner, not leave the
+    // old error on screen until the new request lands.
+    const pending = new Promise<Response>(() => {});
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+        .mockReturnValueOnce(pending),
+    );
+
+    const { result } = renderHook(() => useGame(ID));
+    await waitFor(() => expect(result.current.state.kind).toBe('failed'));
+
+    act(() => result.current.retry());
+
+    expect(result.current.state.kind).toBe('loading');
+  });
+
+  it('shows a fresh request as loading even when the previous one failed', async () => {
+    // Retry must not leave the old failure on screen while the new request runs.
+    const other = '22222222-2222-2222-2222-222222222222';
+    const pending = new Promise<Response>(() => {});
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+        .mockReturnValueOnce(pending),
+    );
+
+    const { result, rerender } = renderHook(({ id }) => useGame(id), {
+      initialProps: { id: ID },
+    });
+    await waitFor(() => expect(result.current.state.kind).toBe('failed'));
+
+    rerender({ id: other });
+
+    expect(result.current.state.kind).toBe('loading');
   });
 
   it('never lets a superseded response overwrite a newer one', async () => {
