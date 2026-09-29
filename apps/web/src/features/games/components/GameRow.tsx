@@ -1,12 +1,18 @@
-import { orDash, resultLabel, sideLabel, sourceLabel } from '../format';
+import { Link } from 'react-router';
+import { orDash, resultLabel, sideLabel, sourceLabel, viewLinkLabel } from '../format';
 import type { GameSummary } from '../types/game';
 
 /**
  * One game as a table row.
  *
- * Its own component because
- * [#11](https://github.com/guyAOgreen/Chess-App/issues/11) turns it into a link to
- * the game viewer, and that should be a change to one file.
+ * The link lives in its own cell rather than wrapping the row: an anchor cannot
+ * validly wrap or replace a `<tr>`. One explicit target per row also gives a
+ * keyboard user a single stop rather than a link in every cell.
+ *
+ * The accessible name names the game, because a screen reader listing links
+ * would otherwise read "View" once per row — and, via `viewLinkLabel`, the
+ * date too, because a repeated pairing (the same two players, several
+ * rounds) would otherwise give several rows the identical name.
  */
 export function GameRow({ game }: { game: GameSummary }) {
   return (
@@ -20,6 +26,14 @@ export function GameRow({ game }: { game: GameSummary }) {
       <td>{orDash(game.round)}</td>
       <td>{orDash(game.eco)}</td>
       <td>{sourceLabel(game.source)}</td>
+      <td>
+        <Link
+          to={`/games/${game.id}`}
+          aria-label={viewLinkLabel(game.white.name, game.black.name, game.playedOn)}
+        >
+          View
+        </Link>
+      </td>
     </tr>
   );
 }

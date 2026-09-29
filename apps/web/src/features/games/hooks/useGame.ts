@@ -1,0 +1,104 @@
+import { useCallback, useEffect, useState } from 'react';
+import { fetchGame, gamePath, GameNotFound } from '../api/games';
+import { messageOf } from '../../../lib/api';
+import type { Game } from '../types/game';
+
+export type GameState =
+  | { kind: 'loading' }
+  | { kind: 'ready'; game: Game }
+  | { kind: 'invalid-id' }
+  | { kind: 'not-found' }
+  | { kind: 'failed'; message: string };
+
+/**
+ * A finished request, tagged with which request it was.
+ *
+ * Without the tag, state settled for one game is indistinguishable from state
+ * for the game now being viewed, and the previous game renders under the new
+ * URL until the effect corrects it.
+ */
+interface Settled {
+  requestKey: string;
+  state: Exclude<GameState, { kind: 'invalid-id' }>;
+}
+
+export interface UseGame {
+  state: GameState;
+  retry: () => void;
+}
+
+/**
+ * The canonical form only. `UUID.fromString` on the backend is lenient — #9
+ * records that it widens `1-1-1-1-1` into a valid identifier and answers 404 —
+ * so this check is deliberately stricter than the server's. Both answers tell the
+ * user the same actionable thing, and this is not the definition of a valid
+ * identifier; it only avoids a request that cannot succeed.
+ */
+const CANONICAL_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * One game's request state.
+ *
+ * Follows the shape `useGames` established — a discriminated union, an
+ * `AbortController` per request, and a `retry` — so both pages behave the same
+ * way when the backend is unreachable. It adds two arms the list does not need:
+ * an identifier that cannot be valid, and a game that is not there.
+ */
+export function useGame(id: string | undefined): UseGame {
+  const valid = id !== undefined && CANONICAL_UUID.test(id);
+  const path = valid ? gamePath(id) : null;
+  const [attempt, setAttempt] = useState(0);
+  const [settled, setSettled] = useState<Settled | null>(null);
+
+  // Which request the state below would belong to. The attempt is part of it so
+  // a retry is a different request from the one that failed, rather than
+  // something that has to reach back and clear the old state. The separator is a
+  // NUL because `encodeURIComponent` can never put one in a path, so the two
+  // parts cannot run together into a key that collides with another request's.
+  const requestKey = path === null ? '' : `${attempt}\u0000${path}`;
+
+  useEffect(() => {
+    if (path === null) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    fetchGame(path, controller.signal)
+      .then((game) => {
+        if (!controller.signal.aborted) {
+          setSettled({ requestKey, state: { kind: 'ready', game } });
+        }
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        setSettled({
+          requestKey,
+          state:
+            error instanceof GameNotFound
+              ? { kind: 'not-found' }
+              : { kind: 'failed', message: messageOf(error) },
+        });
+      });
+
+    return () => controller.abort();
+  }, [path, requestKey]);
+
+  // Everything is derived, so no render can disagree with the id in hand.
+  // `invalid-id` is a pure function of the id; a settled result counts only for
+  // the request that produced it, and anything else is still pending. That is
+  // what stops one game's data appearing under another game's URL, and why the
+  // effect no longer has to correct the render it just caused.
+  const state: GameState =
+    path === null
+      ? { kind: 'invalid-id' }
+      : settled !== null && settled.requestKey === requestKey
+        ? settled.state
+        : { kind: 'loading' };
+
+  const retry = useCallback(() => setAttempt((previous) => previous + 1), []);
+
+  return { state, retry };
+}

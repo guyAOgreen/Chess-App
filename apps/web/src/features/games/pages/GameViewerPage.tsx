@@ -1,0 +1,102 @@
+import { useMemo } from 'react';
+import { Link, useParams } from 'react-router';
+import styles from './GameViewerPage.module.css';
+import { Chessboard } from '../components/Chessboard';
+import { GameHeader } from '../components/GameHeader';
+import { MoveList } from '../components/MoveList';
+import { useGame } from '../hooks/useGame';
+import { useMoveKeys } from '../hooks/useMoveKeys';
+import { useReplay } from '../hooks/useReplay';
+import { replay } from '../replay';
+import type { Game } from '../types/game';
+
+/**
+ * One game, replayed.
+ *
+ * The page owns every state that is about the request rather than about a board:
+ * an identifier that cannot be valid, a game that is not here, a request that
+ * failed, and a game whose moves would not replay.
+ */
+export function GameViewerPage() {
+  const { id } = useParams();
+  const { state, retry } = useGame(id);
+
+  if (state.kind === 'loading') {
+    return <p role="status">Loading game…</p>;
+  }
+
+  if (state.kind === 'invalid-id') {
+    return (
+      <section className={styles.problem}>
+        <p>That game identifier is invalid.</p>
+        <Link to="/">Back to games</Link>
+      </section>
+    );
+  }
+
+  if (state.kind === 'not-found') {
+    return (
+      <section className={styles.problem}>
+        <p>No game with that identifier.</p>
+        <Link to="/">Back to games</Link>
+      </section>
+    );
+  }
+
+  if (state.kind === 'failed') {
+    return (
+      <section className={styles.problem}>
+        <p role="alert">{state.message}</p>
+        <button type="button" onClick={retry}>
+          Retry
+        </button>
+        <Link to="/">Back to games</Link>
+      </section>
+    );
+  }
+
+  // Keyed by game id so a stale ply index cannot survive a move to another game.
+  return <GameViewer key={state.game.id} game={state.game} />;
+}
+
+/**
+ * A loaded game. Separate so that the key above resets its selection, and so
+ * that the replay runs once per game rather than once per render.
+ */
+function GameViewer({ game }: { game: Game }) {
+  const replayed = useMemo(() => replay(game.movetext), [game.movetext]);
+  const { current, select } = useReplay(replayed.plies);
+
+  useMoveKeys({ current, count: replayed.plies.length, select });
+
+  return (
+    <article className={styles.viewer}>
+      <GameHeader game={game} />
+
+      {replayed.error !== null ? (
+        <section className={styles.unreplayable}>
+          <div role="alert">
+            <p>These moves could not be replayed: {replayed.error}</p>
+          </div>
+          <pre className={styles.movetext}>{game.movetext}</pre>
+          {/* replay() guarantees plies is never empty, so index 0 is always defined. */}
+          <Chessboard fen={replayed.plies[0].fen} />
+        </section>
+      ) : (
+        <>
+          <div className={styles.board}>
+            {/* useReplay bounds current to [0, plies.length), and plies is never empty. */}
+            <Chessboard fen={replayed.plies[current].fen} />
+            <MoveList plies={replayed.plies} current={current} onSelect={select} />
+          </div>
+          <p className={styles.hint}>
+            Use <kbd>←</kbd> and <kbd>→</kbd> to step through the moves, <kbd>Home</kbd> and{' '}
+            <kbd>End</kbd> to jump to either end.
+          </p>
+        </>
+      )}
+
+      <Link to="/">Back to games</Link>
+    </article>
+  );
+}

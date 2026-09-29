@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fetchGames, gamesPath, GamesRequestFailed } from './games';
-import type { GamePage, GamesQuery } from '../types/game';
+import { fetchGame, fetchGames, gamePath, gamesPath, GameNotFound, GamesRequestFailed } from './games';
+import type { Game, GamePage, GamesQuery } from '../types/game';
 
 const EMPTY_PAGE: GamePage = {
   content: [],
@@ -144,6 +144,81 @@ describe('fetchGames', () => {
     const controller = new AbortController();
 
     await fetchGames('/api/games?page=0', controller.signal);
+
+    expect(fetchStub.mock.calls[0][1].signal).toBe(controller.signal);
+  });
+});
+
+const A_GAME: Game = {
+  id: '11111111-1111-1111-1111-111111111111',
+  white: { playerId: 'w', name: 'Carlsen, M', rating: 2839 },
+  black: { playerId: 'b', name: 'Nepomniachtchi, I', rating: 2792 },
+  event: 'World Championship',
+  site: 'Dubai',
+  round: '6',
+  playedOn: '2021-12-03',
+  result: 'WHITE_WON',
+  eco: 'C88',
+  source: 'PGN_IMPORT',
+  movetext: '1. e4 e5',
+};
+
+describe('gamePath', () => {
+  it('addresses one game by identifier', () => {
+    expect(gamePath('11111111-1111-1111-1111-111111111111')).toBe(
+      '/api/games/11111111-1111-1111-1111-111111111111',
+    );
+  });
+
+  it('encodes an identifier that would otherwise change the path', () => {
+    expect(gamePath('a/b')).toBe('/api/games/a%2Fb');
+  });
+});
+
+describe('fetchGame', () => {
+  it('returns the game, movetext included', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(A_GAME)));
+
+    await expect(fetchGame('/api/games/x')).resolves.toEqual(A_GAME);
+  });
+
+  it('distinguishes a missing game from a failure, because they mean different things', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ status: 404 }, 404)));
+
+    await expect(fetchGame('/api/games/x')).rejects.toBeInstanceOf(GameNotFound);
+  });
+
+  it('treats any other rejection as a failure, naming the status', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ status: 400 }, 400)));
+
+    const failure = fetchGame('/api/games/x');
+    await expect(failure).rejects.not.toBeInstanceOf(GameNotFound);
+    await expect(failure).rejects.toBeInstanceOf(GamesRequestFailed);
+    await expect(failure).rejects.toThrow(/\(400\)/);
+  });
+
+  it('fails when the response is not JSON', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(nonJsonResponse(502)));
+
+    const failure = fetchGame('/api/games/x');
+    await expect(failure).rejects.toBeInstanceOf(GamesRequestFailed);
+    await expect(failure).rejects.toThrow(/502/);
+  });
+
+  it('fails, keeping the transport message, when the backend cannot be reached', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+
+    const failure = fetchGame('/api/games/x');
+    await expect(failure).rejects.toBeInstanceOf(GamesRequestFailed);
+    await expect(failure).rejects.toThrow(/Failed to fetch/);
+  });
+
+  it('passes the abort signal through', async () => {
+    const fetchStub = vi.fn().mockResolvedValue(jsonResponse(A_GAME));
+    vi.stubGlobal('fetch', fetchStub);
+    const controller = new AbortController();
+
+    await fetchGame('/api/games/x', controller.signal);
 
     expect(fetchStub.mock.calls[0][1].signal).toBe(controller.signal);
   });

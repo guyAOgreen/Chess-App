@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GamesPage } from './GamesPage';
 import type { GamePage, GameSummary } from '../types/game';
@@ -41,7 +42,11 @@ describe('GamesPage', () => {
   it('lists the games it loaded', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(respondWith(page([game('1', 'Hastings')]))));
 
-    render(<GamesPage />);
+    render(
+      <MemoryRouter>
+        <GamesPage />
+      </MemoryRouter>,
+    );
 
     expect(screen.getByText(/loading games/i)).toBeInTheDocument();
     // The form has to be usable while still loading, not just once something arrives.
@@ -61,7 +66,11 @@ describe('GamesPage', () => {
     const fetchStub = vi.fn().mockResolvedValue(respondWith(twoPages));
     vi.stubGlobal('fetch', fetchStub);
 
-    render(<GamesPage />);
+    render(
+      <MemoryRouter>
+        <GamesPage />
+      </MemoryRouter>,
+    );
     await screen.findByText('Hastings');
 
     fetchStub.mockClear();
@@ -84,7 +93,11 @@ describe('GamesPage', () => {
     const fetchStub = vi.fn().mockResolvedValue(respondWith(twoPages));
     vi.stubGlobal('fetch', fetchStub);
 
-    render(<GamesPage />);
+    render(
+      <MemoryRouter>
+        <GamesPage />
+      </MemoryRouter>,
+    );
     await screen.findByText('Hastings');
 
     // Leave page 0 first, so resetting to it on the next filter change is an
@@ -115,7 +128,11 @@ describe('GamesPage', () => {
   it('says the database is empty when nothing is filtered, and keeps the filters usable', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(respondWith(page([]))));
 
-    render(<GamesPage />);
+    render(
+      <MemoryRouter>
+        <GamesPage />
+      </MemoryRouter>,
+    );
 
     expect(await screen.findByText(/no games yet/i)).toBeInTheDocument();
     // The empty-result branch must never hand GameTable an empty array — it
@@ -129,7 +146,11 @@ describe('GamesPage', () => {
   it('says the filters matched nothing when a filter is set, and lets the user filter back out', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(respondWith(page([]))));
 
-    render(<GamesPage />);
+    render(
+      <MemoryRouter>
+        <GamesPage />
+      </MemoryRouter>,
+    );
     await screen.findByText(/no games yet/i);
 
     await userEvent.selectOptions(screen.getByLabelText(/result/i), 'DRAW');
@@ -152,7 +173,11 @@ describe('GamesPage', () => {
       .mockResolvedValueOnce(respondWith(page([game('1', 'Hastings')])));
     vi.stubGlobal('fetch', fetchStub);
 
-    render(<GamesPage />);
+    render(
+      <MemoryRouter>
+        <GamesPage />
+      </MemoryRouter>,
+    );
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/failed to fetch/i);
     expect(screen.getByLabelText(/event/i)).toBeEnabled();
@@ -175,7 +200,11 @@ describe('GamesPage', () => {
       .mockImplementationOnce(() => second);
     vi.stubGlobal('fetch', fetchStub);
 
-    render(<GamesPage />);
+    render(
+      <MemoryRouter>
+        <GamesPage />
+      </MemoryRouter>,
+    );
     await screen.findByText('Hastings');
 
     const wrapper = screen.getByRole('table').closest('[aria-busy]');

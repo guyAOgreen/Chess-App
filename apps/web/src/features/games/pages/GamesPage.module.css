@@ -2,7 +2,7 @@
   padding: 24px 0;
 }
 
-/* Nine columns do not fit a narrow screen. Scrolling the table is honest;
+/* Ten columns do not fit a narrow screen. Scrolling the table is honest;
    inventing a card layout for a screen nobody has used is guesswork. */
 .tableWrapper {
   overflow-x: auto;
