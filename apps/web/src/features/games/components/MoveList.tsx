@@ -1,5 +1,10 @@
+import { useLayoutEffect, useRef } from 'react';
 import styles from './MoveList.module.css';
 import type { Ply } from '../types/ply';
+
+/** The selected move. The same attribute the highlight's CSS keys off, so the
+ * scroll and the highlight can never disagree about which move is current. */
+const CURRENT_MOVE = '[aria-current="true"]';
 
 interface MoveRow {
   moveNumber: number;
@@ -47,8 +52,21 @@ export interface MoveListProps {
  * Takes plies and an index, so it is decoupled from how the game was loaded.
  */
 export function MoveList({ plies, current, onSelect }: MoveListProps) {
+  const listRef = useRef<HTMLDivElement | null>(null);
+
+  // The list has its own max-height and scrolls independently of the board, so a
+  // selection made with the keyboard can land outside the visible window — the
+  // board would move while the highlight stayed where it was. `block: 'nearest'`
+  // scrolls the list only as far as needed, never the page, and does nothing at
+  // all when the move is already visible, which is why a click needs no special
+  // case. A layout effect rather than an effect, so the scroll happens before
+  // paint instead of as a visible jump.
+  useLayoutEffect(() => {
+    listRef.current?.querySelector(CURRENT_MOVE)?.scrollIntoView({ block: 'nearest' });
+  }, [current]);
+
   return (
-    <div className={styles.moves}>
+    <div className={styles.moves} ref={listRef}>
       <button
         type="button"
         className={styles.start}

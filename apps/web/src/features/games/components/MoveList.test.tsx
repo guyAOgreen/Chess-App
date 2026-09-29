@@ -134,6 +134,33 @@ describe('MoveList', () => {
     expect(screen.getByRole('button', { name: 'e4' })).toHaveClass(styles.move);
   });
 
+  it('brings the newly selected move into view inside its own scroll container', () => {
+    // The list has its own max-height and scrolls independently of the board, so
+    // a selection made by keyboard can land outside the visible window.
+    const { rerender } = render(<MoveList plies={PLIES} current={0} onSelect={vi.fn()} />);
+    const target = screen.getByRole('button', { name: 'Bb5' });
+    const other = screen.getByRole('button', { name: 'e4' });
+    const targetScroll = vi.spyOn(target, 'scrollIntoView');
+    const otherScroll = vi.spyOn(other, 'scrollIntoView');
+
+    rerender(<MoveList plies={PLIES} current={5} onSelect={vi.fn()} />);
+
+    // 'nearest' scrolls the list only as far as needed and never the page, and
+    // does nothing at all when the move is already visible.
+    expect(targetScroll).toHaveBeenCalledExactlyOnceWith({ block: 'nearest' });
+    expect(otherScroll).not.toHaveBeenCalled();
+  });
+
+  it('brings the initial position into view when the selection returns to it', () => {
+    const { rerender } = render(<MoveList plies={PLIES} current={5} onSelect={vi.fn()} />);
+    const start = screen.getByRole('button', { name: /start/i });
+    const startScroll = vi.spyOn(start, 'scrollIntoView');
+
+    rerender(<MoveList plies={PLIES} current={0} onSelect={vi.fn()} />);
+
+    expect(startScroll).toHaveBeenCalledExactlyOnceWith({ block: 'nearest' });
+  });
+
   it('gives the table an accessible name', () => {
     render(<MoveList plies={PLIES} current={0} onSelect={vi.fn()} />);
 
