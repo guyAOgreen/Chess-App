@@ -22,23 +22,6 @@
   background: var(--accent-bg);
 }
 
-.failure button {
+.retry {
   flex-shrink: 0;
-  font: inherit;
-  font-size: 15px;
-  color: var(--text-h);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 6px 12px;
-  cursor: pointer;
-}
-
-.failure button:hover {
-  border-color: var(--accent-border);
-}
-
-.failure button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
 }
