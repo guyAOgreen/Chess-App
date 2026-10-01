@@ -1,0 +1,53 @@
+name: Bug
+description: Something behaves incorrectly.
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Where the bug shows up. Apply the matching labels too — forms cannot do it.
+      multiple: true
+      options:
+        - backend (services/core)
+        - frontend (apps/web)
+        - chess-rules (deterministic chess logic and PGN)
+        - ai (recognition and model integration)
+        - infra (infrastructure, build, CI)
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. POST /api/games with the PGN below
+        2. Open /games/{id}
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual
+      description: Include error messages or responses. Do not paste credentials or API keys.
+    validations:
+      required: true
+
+  - type: textarea
+    id: position
+    attributes:
+      label: FEN or PGN that reproduces it
+      description: >-
+        **Required for chess-rules bugs.** The smallest position or game that shows the problem —
+        it becomes the deterministic regression test.
+      render: text

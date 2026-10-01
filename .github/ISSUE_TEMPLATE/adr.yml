@@ -1,0 +1,48 @@
+name: Architectural decision
+description: A decision whose reasoning is worth keeping, recorded as an ADR under docs/adr/.
+labels: ["adr"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The outcome is recorded as `docs/adr/NNNN-<topic>.md`, following the existing ADRs
+        (Context, Options considered, Decision, Consequences, Not decided here).
+        If it materially changes architecture, scope or service boundaries, `CONTEXT.md` is updated too.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What forces this decision now? What constraints apply?
+    validations:
+      required: true
+
+  - type: textarea
+    id: decision
+    attributes:
+      label: Decision needed
+      description: The question to be answered, stated as narrowly as possible.
+    validations:
+      required: true
+
+  - type: textarea
+    id: options
+    attributes:
+      label: Options considered
+      description: Each option with its trade-offs. Include "do nothing yet" where it is a real option.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reversibility
+    attributes:
+      label: What makes it hard to reverse
+      description: Persistence formats, public API contracts, dependencies, licensing, data already written...
+    validations:
+      required: true
+
+  - type: textarea
+    id: not-decided
+    attributes:
+      label: Not decided here
+      description: Related questions this deliberately leaves open.
