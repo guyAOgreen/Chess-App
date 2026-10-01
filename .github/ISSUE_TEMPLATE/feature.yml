@@ -1,0 +1,49 @@
+name: Feature
+description: New behaviour or a change to existing behaviour.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Read [CONTEXT.md](https://github.com/guyAOgreen/Chess-App/blob/master/CONTEXT.md) first — it is the source of truth for product direction.
+
+        A feature that spans several modules, changes architecture, adds infrastructure or an external
+        integration, or significantly alters persistence needs a design before implementation
+        (see CLAUDE.md, "Large features"). If it needs an architectural decision first, open an ADR issue instead.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What can't a user (or developer) do today, and why does it matter?
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What this issue delivers. Prefer one coherent vertical slice.
+    validations:
+      required: true
+
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: What this deliberately does not do, so it is not quietly expanded.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which parts of the repository this touches. Apply the matching labels too — forms cannot do it.
+      multiple: true
+      options:
+        - backend (services/core)
+        - frontend (apps/web)
+        - chess-rules (deterministic chess logic and PGN)
+        - ai (recognition and model integration)
+        - infra (infrastructure, build, CI)
+    validations:
+      required: true
