@@ -1,31 +1,11 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useGame } from './useGame';
-import type { Game } from '../types/game';
+import { aGame, jsonResponse } from '../../../test/fixtures';
 
 const ID = '11111111-1111-1111-1111-111111111111';
 
-const A_GAME: Game = {
-  id: ID,
-  white: { playerId: 'w', name: 'Carlsen, M', rating: 2839 },
-  black: { playerId: 'b', name: 'Nepomniachtchi, I', rating: 2792 },
-  event: 'World Championship',
-  site: 'Dubai',
-  round: '6',
-  playedOn: '2021-12-03',
-  result: 'WHITE_WON',
-  eco: 'C88',
-  source: 'PGN_IMPORT',
-  movetext: '1. e4 e5',
-};
-
-function jsonResponse(body: unknown, status = 200): Response {
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    json: async () => body,
-  } as unknown as Response;
-}
+const A_GAME = aGame({ id: ID });
 
 afterEach(() => {
   vi.unstubAllGlobals();

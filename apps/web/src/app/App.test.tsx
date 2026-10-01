@@ -1,12 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
+import { aPage, jsonResponse } from '../test/fixtures';
 
-function jsonResponse(body: unknown): Response {
-  return { ok: true, status: 200, json: async () => body } as unknown as Response;
-}
-
-const EMPTY_PAGE = { content: [], page: 0, size: 25, totalElements: 0, totalPages: 0 };
+const EMPTY_PAGE = aPage([]);
 
 afterEach(() => {
   vi.unstubAllGlobals();

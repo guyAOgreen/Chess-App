@@ -1,24 +1,13 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { GameHeader } from './GameHeader';
-import type { Game } from '../types/game';
+import { aGame } from '../../../test/fixtures';
 
-const COMPLETE: Game = {
+// Every field set; the assertions below read aGame's defaults.
+const COMPLETE = aGame({ id: '1' });
+
+const SPARSE = aGame({
   id: '1',
-  white: { playerId: 'w', name: 'Carlsen, M', rating: 2839 },
-  black: { playerId: 'b', name: 'Nepomniachtchi, I', rating: 2792 },
-  event: 'World Championship',
-  site: 'Dubai',
-  round: '6',
-  playedOn: '2021-12-03',
-  result: 'WHITE_WON',
-  eco: 'C88',
-  source: 'PGN_IMPORT',
-  movetext: '1. e4 e5',
-};
-
-const SPARSE: Game = {
-  ...COMPLETE,
   white: { playerId: 'w', name: 'Green, G', rating: null },
   black: { playerId: 'b', name: 'Opponent, O', rating: null },
   event: null,
@@ -27,7 +16,7 @@ const SPARSE: Game = {
   playedOn: null,
   eco: null,
   result: 'UNFINISHED',
-};
+});
 
 /**
  * The value shown under a given `<dt>` label, read via its containing `<div>`

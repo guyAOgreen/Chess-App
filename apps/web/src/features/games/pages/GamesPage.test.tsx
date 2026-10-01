@@ -3,36 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GamesPage } from './GamesPage';
-import type { GamePage, GameSummary } from '../types/game';
-
-function game(id: string, event: string): GameSummary {
-  return {
-    id,
-    white: { playerId: 'w', name: 'Carlsen, M', rating: 2839 },
-    black: { playerId: 'b', name: 'Nepomniachtchi, I', rating: 2792 },
-    event,
-    site: 'Dubai',
-    round: '6',
-    playedOn: '2021-12-03',
-    result: 'WHITE_WON',
-    eco: 'C88',
-    source: 'PGN_IMPORT',
-  };
-}
-
-function page(games: GameSummary[]): GamePage {
-  return {
-    content: games,
-    page: 0,
-    size: 25,
-    totalElements: games.length,
-    totalPages: games.length === 0 ? 0 : 1,
-  };
-}
-
-function respondWith(body: unknown) {
-  return { ok: true, status: 200, json: async () => body } as unknown as Response;
-}
+import { aGameSummary, aPage, jsonResponse } from '../../../test/fixtures';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -40,7 +11,12 @@ afterEach(() => {
 
 describe('GamesPage', () => {
   it('lists the games it loaded', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(respondWith(page([game('1', 'Hastings')]))));
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(jsonResponse(aPage([aGameSummary({ id: '1', event: 'Hastings' })]))),
+    );
 
     render(
       <MemoryRouter>
@@ -56,14 +32,11 @@ describe('GamesPage', () => {
   });
 
   it('pages forward through the pager, requesting the next page', async () => {
-    const twoPages: GamePage = {
-      content: [game('1', 'Hastings')],
-      page: 0,
-      size: 25,
+    const twoPages = aPage([aGameSummary({ id: '1', event: 'Hastings' })], {
       totalElements: 30,
       totalPages: 2,
-    };
-    const fetchStub = vi.fn().mockResolvedValue(respondWith(twoPages));
+    });
+    const fetchStub = vi.fn().mockResolvedValue(jsonResponse(twoPages));
     vi.stubGlobal('fetch', fetchStub);
 
     render(
@@ -83,14 +56,11 @@ describe('GamesPage', () => {
   });
 
   it('sends the event term once typing settles, resetting to the first page', async () => {
-    const twoPages: GamePage = {
-      content: [game('1', 'Hastings')],
-      page: 0,
-      size: 25,
+    const twoPages = aPage([aGameSummary({ id: '1', event: 'Hastings' })], {
       totalElements: 30,
       totalPages: 2,
-    };
-    const fetchStub = vi.fn().mockResolvedValue(respondWith(twoPages));
+    });
+    const fetchStub = vi.fn().mockResolvedValue(jsonResponse(twoPages));
     vi.stubGlobal('fetch', fetchStub);
 
     render(
@@ -126,7 +96,7 @@ describe('GamesPage', () => {
   });
 
   it('says the database is empty when nothing is filtered, and keeps the filters usable', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(respondWith(page([]))));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(aPage([]))));
 
     render(
       <MemoryRouter>
@@ -144,7 +114,7 @@ describe('GamesPage', () => {
   });
 
   it('says the filters matched nothing when a filter is set, and lets the user filter back out', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(respondWith(page([]))));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(aPage([]))));
 
     render(
       <MemoryRouter>
@@ -170,7 +140,7 @@ describe('GamesPage', () => {
     const fetchStub = vi
       .fn()
       .mockRejectedValueOnce(new TypeError('Failed to fetch'))
-      .mockResolvedValueOnce(respondWith(page([game('1', 'Hastings')])));
+      .mockResolvedValueOnce(jsonResponse(aPage([aGameSummary({ id: '1', event: 'Hastings' })])));
     vi.stubGlobal('fetch', fetchStub);
 
     render(
@@ -196,7 +166,7 @@ describe('GamesPage', () => {
     });
     const fetchStub = vi
       .fn()
-      .mockResolvedValueOnce(respondWith(page([game('1', 'Hastings')])))
+      .mockResolvedValueOnce(jsonResponse(aPage([aGameSummary({ id: '1', event: 'Hastings' })])))
       .mockImplementationOnce(() => second);
     vi.stubGlobal('fetch', fetchStub);
 
@@ -218,7 +188,7 @@ describe('GamesPage', () => {
     // The stale page must stay on screen while the refresh is pending, not blank out.
     expect(screen.getByText('Hastings')).toBeInTheDocument();
 
-    resolveSecond(respondWith(page([game('2', 'London')])));
+    resolveSecond(jsonResponse(aPage([aGameSummary({ id: '2', event: 'London' })])));
 
     await waitFor(() => {
       expect(wrapper).toHaveAttribute('aria-busy', 'false');
