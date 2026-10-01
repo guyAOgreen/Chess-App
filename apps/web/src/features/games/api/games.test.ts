@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fetchGame, fetchGames, gamePath, gamesPath, GameNotFound, GamesRequestFailed } from './games';
+import {
+  fetchGame,
+  fetchGames,
+  gamePath,
+  gamesPath,
+  GameNotFound,
+  GamesRequestFailed,
+} from './games';
 import type { Game, GamePage, GamesQuery } from '../types/game';
 
 const EMPTY_PAGE: GamePage = {
@@ -50,9 +57,7 @@ describe('gamesPath', () => {
       page: 2,
     });
 
-    expect(path).toBe(
-      '/api/games?result=DRAW&from=2024-01-01&to=2024-12-31&event=Hastings&page=2',
-    );
+    expect(path).toBe('/api/games?result=DRAW&from=2024-01-01&to=2024-12-31&event=Hastings&page=2');
   });
 
   it('never sends sort, direction or size even when the query object carries them', () => {

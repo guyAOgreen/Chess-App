@@ -97,9 +97,12 @@ describe('useDebouncedValue', () => {
     // the dependency array. To isolate the delayMs dependency, change delayMs on a
     // rerender where the value stays the same, so a stale effect (still running on
     // the old timer, scheduled with the old delay) becomes observable.
-    const { result, rerender } = renderHook(({ value, delayMs }) => useDebouncedValue(value, delayMs), {
-      initialProps: { value: 'a', delayMs: 1000 },
-    });
+    const { result, rerender } = renderHook(
+      ({ value, delayMs }) => useDebouncedValue(value, delayMs),
+      {
+        initialProps: { value: 'a', delayMs: 1000 },
+      },
+    );
 
     rerender({ value: 'b', delayMs: 1000 });
     act(() => {

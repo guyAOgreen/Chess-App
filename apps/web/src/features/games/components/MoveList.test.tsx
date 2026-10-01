@@ -118,10 +118,7 @@ describe('MoveList', () => {
   it('marks the start button as current when viewing the initial position', () => {
     render(<MoveList plies={PLIES} current={0} onSelect={vi.fn()} />);
 
-    expect(screen.getByRole('button', { name: /start/i })).toHaveAttribute(
-      'aria-current',
-      'true',
-    );
+    expect(screen.getByRole('button', { name: /start/i })).toHaveAttribute('aria-current', 'true');
     expect(screen.getByRole('button', { name: 'e4' })).not.toHaveAttribute('aria-current');
   });
 

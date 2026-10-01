@@ -9,6 +9,7 @@ organised.
     yarn dev      # dev server, proxying /api and /actuator to the backend on 8080
     yarn test     # Vitest + Testing Library, once (yarn test:watch to watch)
     yarn lint     # Oxlint, configured in .oxlintrc.json
+    yarn format   # Prettier, configured in .prettierrc.json (format:check to check only)
     yarn build    # type-check, then production build into dist/
 
 ## Layout

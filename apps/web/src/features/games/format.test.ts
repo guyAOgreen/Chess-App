@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { orDash, resultLabel, sideLabel, sourceLabel, spokenResultLabel, viewLinkLabel } from './format';
+import {
+  orDash,
+  resultLabel,
+  sideLabel,
+  sourceLabel,
+  spokenResultLabel,
+  viewLinkLabel,
+} from './format';
 import { GAME_RESULTS, GAME_SOURCES } from './types/game';
 
 describe('resultLabel', () => {
