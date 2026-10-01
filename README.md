@@ -71,6 +71,8 @@ SSL detail, because nothing authenticates callers yet.
 
 ## Current state
 
-This is the project skeleton only. There is no domain code yet — no games,
-players or PGN handling. See the open issues and milestones for what comes
-next.
+Progress is tracked by
+[milestone](https://github.com/guyAOgreen/Chess-App/milestones), in order:
+M1 is the game database (import, validate, store and view PGN games), M2 the
+GameImport review workflow, M3 scoresheet recognition, and so on. The lowest
+open milestone is the one in progress; its open issues are what remains.
