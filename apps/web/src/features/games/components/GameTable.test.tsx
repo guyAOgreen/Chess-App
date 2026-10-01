@@ -197,10 +197,7 @@ describe('GameTable', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole('link', { name: /Carlsen, M/ })).toHaveAttribute(
-      'href',
-      '/games/1',
-    );
+    expect(screen.getByRole('link', { name: /Carlsen, M/ })).toHaveAttribute('href', '/games/1');
     expect(screen.getByRole('link', { name: /Green, G/ })).toHaveAttribute('href', '/games/2');
   });
 

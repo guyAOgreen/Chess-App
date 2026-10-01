@@ -137,10 +137,7 @@ describe('useGame', () => {
     const pending = new Promise<Response>(() => {});
     vi.stubGlobal(
       'fetch',
-      vi
-        .fn()
-        .mockRejectedValueOnce(new TypeError('Failed to fetch'))
-        .mockReturnValueOnce(pending),
+      vi.fn().mockRejectedValueOnce(new TypeError('Failed to fetch')).mockReturnValueOnce(pending),
     );
 
     const { result } = renderHook(() => useGame(ID));
@@ -157,10 +154,7 @@ describe('useGame', () => {
     const pending = new Promise<Response>(() => {});
     vi.stubGlobal(
       'fetch',
-      vi
-        .fn()
-        .mockRejectedValueOnce(new TypeError('Failed to fetch'))
-        .mockReturnValueOnce(pending),
+      vi.fn().mockRejectedValueOnce(new TypeError('Failed to fetch')).mockReturnValueOnce(pending),
     );
 
     const { result, rerender } = renderHook(({ id }) => useGame(id), {
