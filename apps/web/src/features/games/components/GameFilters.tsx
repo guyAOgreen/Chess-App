@@ -1,4 +1,5 @@
 import styles from './GameFilters.module.css';
+import { Button } from '../../../components/shared/Button';
 import { resultLabel } from '../format';
 import { GAME_RESULTS, type GameFilterValues, type GameResult } from '../types/game';
 
@@ -74,9 +75,7 @@ export function GameFilters({ values, onChange, onClear }: GameFiltersProps) {
         />
       </label>
 
-      <button type="button" className={styles.clear} onClick={onClear}>
-        Clear filters
-      </button>
+      <Button onClick={onClear}>Clear filters</Button>
     </form>
   );
 }

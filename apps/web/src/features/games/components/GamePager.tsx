@@ -1,4 +1,5 @@
 import styles from './GamePager.module.css';
+import { Button } from '../../../components/shared/Button';
 
 export interface GamePagerProps {
   /** Zero-based, as `GamePageResponse` reports it. */
@@ -20,25 +21,15 @@ export function GamePager({ page, totalElements, totalPages, onPageChange }: Gam
 
   return (
     <nav className={styles.pager} aria-label="Pagination">
-      <button
-        type="button"
-        className={styles.step}
-        disabled={page <= 0}
-        onClick={() => onPageChange(page - 1)}
-      >
+      <Button disabled={page <= 0} onClick={() => onPageChange(page - 1)}>
         Previous
-      </button>
+      </Button>
       <span className={styles.position} aria-live="polite">
         Page {page + 1} of {totalPages} · {games}
       </span>
-      <button
-        type="button"
-        className={styles.step}
-        disabled={page + 1 >= totalPages}
-        onClick={() => onPageChange(page + 1)}
-      >
+      <Button disabled={page + 1 >= totalPages} onClick={() => onPageChange(page + 1)}>
         Next
-      </button>
+      </Button>
     </nav>
   );
 }

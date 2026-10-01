@@ -1,4 +1,5 @@
 import styles from './GamesPage.module.css';
+import { Button } from '../../../components/shared/Button';
 import { GameFilters } from '../components/GameFilters';
 import { GamePager } from '../components/GamePager';
 import { GameTable } from '../components/GameTable';
@@ -29,9 +30,9 @@ export function GamesPage() {
       {state.kind === 'failed' && (
         <div role="alert" className={styles.failure}>
           <p>{state.message}</p>
-          <button type="button" onClick={retry}>
+          <Button className={styles.retry} onClick={retry}>
             Retry
-          </button>
+          </Button>
         </div>
       )}
 

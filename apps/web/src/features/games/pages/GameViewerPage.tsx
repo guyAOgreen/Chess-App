@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Link, useParams } from 'react-router';
 import styles from './GameViewerPage.module.css';
+import { Button } from '../../../components/shared/Button';
 import { Chessboard } from '../components/Chessboard';
 import { GameHeader } from '../components/GameHeader';
 import { MoveList } from '../components/MoveList';
@@ -47,9 +48,9 @@ export function GameViewerPage() {
     return (
       <section className={styles.problem}>
         <p role="alert">{state.message}</p>
-        <button type="button" onClick={retry}>
+        <Button className={styles.retry} onClick={retry}>
           Retry
-        </button>
+        </Button>
         <Link to="/">Back to games</Link>
       </section>
     );
