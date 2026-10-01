@@ -1,23 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getJson, queryString } from './api';
-
-function jsonResponse(body: unknown, status = 200): Response {
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    json: async () => body,
-  } as unknown as Response;
-}
-
-function nonJsonResponse(status: number): Response {
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    json: async () => {
-      throw new SyntaxError('Unexpected token < in JSON at position 0');
-    },
-  } as unknown as Response;
-}
+import { jsonResponse, NON_JSON_MESSAGE, nonJsonResponse } from '../test/fixtures';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -69,7 +52,7 @@ describe('getJson', () => {
       kind: 'invalid-body',
       ok: false,
       status: 502,
-      message: 'Unexpected token < in JSON at position 0',
+      message: NON_JSON_MESSAGE,
     });
   });
 

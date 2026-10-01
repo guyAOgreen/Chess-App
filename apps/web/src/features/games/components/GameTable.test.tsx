@@ -3,20 +3,13 @@ import { MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import { GameTable } from './GameTable';
 import type { GameSummary } from '../types/game';
+import { aGameSummary } from '../../../test/fixtures';
 
-const COMPLETE: GameSummary = {
-  id: '1',
-  white: { playerId: 'w', name: 'Carlsen, M', rating: 2839 },
-  black: { playerId: 'b', name: 'Nepomniachtchi, I', rating: 2792 },
-  event: 'World Championship',
-  site: 'Dubai',
-  round: '6',
-  playedOn: '2021-12-03',
-  result: 'WHITE_WON',
-  eco: 'C88',
-  source: 'PGN_IMPORT',
-};
+// Every field set; the column assertions below read aGameSummary's defaults.
+const COMPLETE = aGameSummary({ id: '1' });
 
+// Spelled out rather than built: the em-dash test depends on exactly these five
+// optional fields being null, which an override list would hide.
 const SPARSE: GameSummary = {
   id: '2',
   white: { playerId: 'w', name: 'Green, G', rating: null },

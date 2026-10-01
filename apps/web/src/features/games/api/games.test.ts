@@ -7,33 +7,10 @@ import {
   GameNotFound,
   GamesRequestFailed,
 } from './games';
-import type { Game, GamePage, GamesQuery } from '../types/game';
+import type { GamesQuery } from '../types/game';
+import { aGame, aPage, jsonResponse, nonJsonResponse } from '../../../test/fixtures';
 
-const EMPTY_PAGE: GamePage = {
-  content: [],
-  page: 0,
-  size: 25,
-  totalElements: 0,
-  totalPages: 0,
-};
-
-function jsonResponse(body: unknown, status = 200): Response {
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    json: async () => body,
-  } as unknown as Response;
-}
-
-function nonJsonResponse(status: number): Response {
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    json: async () => {
-      throw new SyntaxError('Unexpected token <');
-    },
-  } as unknown as Response;
-}
+const EMPTY_PAGE = aPage([]);
 
 async function failureOf(path: string): Promise<unknown> {
   return fetchGames(path).catch((error: unknown) => error);
@@ -154,19 +131,7 @@ describe('fetchGames', () => {
   });
 });
 
-const A_GAME: Game = {
-  id: '11111111-1111-1111-1111-111111111111',
-  white: { playerId: 'w', name: 'Carlsen, M', rating: 2839 },
-  black: { playerId: 'b', name: 'Nepomniachtchi, I', rating: 2792 },
-  event: 'World Championship',
-  site: 'Dubai',
-  round: '6',
-  playedOn: '2021-12-03',
-  result: 'WHITE_WON',
-  eco: 'C88',
-  source: 'PGN_IMPORT',
-  movetext: '1. e4 e5',
-};
+const A_GAME = aGame();
 
 describe('gamePath', () => {
   it('addresses one game by identifier', () => {

@@ -1,36 +1,8 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useGames } from './useGames';
-import type { GamePage, GameSummary, GamesQuery } from '../types/game';
-
-function game(id: string, event: string): GameSummary {
-  return {
-    id,
-    white: { playerId: 'w', name: 'White, W', rating: 2000 },
-    black: { playerId: 'b', name: 'Black, B', rating: 1900 },
-    event,
-    site: null,
-    round: null,
-    playedOn: '2024-05-01',
-    result: 'DRAW',
-    eco: null,
-    source: 'PGN_IMPORT',
-  };
-}
-
-function page(games: GameSummary[]): GamePage {
-  return {
-    content: games,
-    page: 0,
-    size: 25,
-    totalElements: games.length,
-    totalPages: games.length === 0 ? 0 : 1,
-  };
-}
-
-function jsonResponse(body: unknown): Response {
-  return { ok: true, status: 200, json: async () => body } as unknown as Response;
-}
+import type { GamesQuery } from '../types/game';
+import { aGameSummary, aPage, jsonResponse } from '../../../test/fixtures';
 
 /** A promise this test resolves by hand, so response ordering can be controlled. */
 function deferred<T>() {
@@ -49,7 +21,12 @@ afterEach(() => {
 
 describe('useGames', () => {
   it('loads, then reports the page', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(page([game('1', 'Hastings')]))));
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(jsonResponse(aPage([aGameSummary({ id: '1', event: 'Hastings' })]))),
+    );
 
     const { result } = renderHook(() => useGames(NO_FILTERS));
 
@@ -65,7 +42,7 @@ describe('useGames', () => {
   });
 
   it('requests the filters it was given', async () => {
-    const fetchStub = vi.fn().mockResolvedValue(jsonResponse(page([])));
+    const fetchStub = vi.fn().mockResolvedValue(jsonResponse(aPage([])));
     vi.stubGlobal('fetch', fetchStub);
 
     renderHook(() => useGames({ result: 'DRAW', event: 'Hastings', page: 2 }));
@@ -75,7 +52,7 @@ describe('useGames', () => {
   });
 
   it('does not refetch when the query is a new object with the same values', async () => {
-    const fetchStub = vi.fn().mockResolvedValue(jsonResponse(page([])));
+    const fetchStub = vi.fn().mockResolvedValue(jsonResponse(aPage([])));
     vi.stubGlobal('fetch', fetchStub);
 
     const { rerender } = renderHook(({ query }) => useGames(query), {
@@ -100,7 +77,7 @@ describe('useGames', () => {
       initialProps: { query: { page: 0 } as GamesQuery },
     });
 
-    first.resolve(jsonResponse(page([game('1', 'Hastings')])));
+    first.resolve(jsonResponse(aPage([aGameSummary({ id: '1', event: 'Hastings' })])));
     await waitFor(() => expect(result.current.state.kind).toBe('ready'));
 
     rerender({ query: { page: 1 } as GamesQuery });
@@ -113,7 +90,7 @@ describe('useGames', () => {
       }
     });
 
-    second.resolve(jsonResponse(page([game('2', 'Wijk aan Zee')])));
+    second.resolve(jsonResponse(aPage([aGameSummary({ id: '2', event: 'Wijk aan Zee' })])));
     await waitFor(() => {
       expect(result.current.state.kind).toBe('ready');
       if (result.current.state.kind === 'ready') {
@@ -139,10 +116,10 @@ describe('useGames', () => {
 
     rerender({ query: { event: 'Wijk aan Zee', page: 0 } as GamesQuery });
 
-    fastSecond.resolve(jsonResponse(page([game('2', 'Wijk aan Zee')])));
+    fastSecond.resolve(jsonResponse(aPage([aGameSummary({ id: '2', event: 'Wijk aan Zee' })])));
     await waitFor(() => expect(result.current.state.kind).toBe('ready'));
 
-    slowFirst.resolve(jsonResponse(page([game('1', 'Hastings')])));
+    slowFirst.resolve(jsonResponse(aPage([aGameSummary({ id: '1', event: 'Hastings' })])));
     // Give the (already-resolved) slow response's `.then` a turn of the
     // microtask queue, so a missing abort guard has a chance to act before
     // the assertion below runs.
@@ -161,7 +138,7 @@ describe('useGames', () => {
     const fetchStub = vi
       .fn()
       .mockRejectedValueOnce(new TypeError('Failed to fetch'))
-      .mockResolvedValueOnce(jsonResponse(page([game('1', 'Hastings')])));
+      .mockResolvedValueOnce(jsonResponse(aPage([aGameSummary({ id: '1', event: 'Hastings' })])));
     vi.stubGlobal('fetch', fetchStub);
 
     const { result } = renderHook(() => useGames(NO_FILTERS));
