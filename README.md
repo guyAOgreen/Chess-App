@@ -68,6 +68,7 @@ SSL detail, because nothing authenticates callers yet.
     mvn -f services/core/pom.xml verify     # needs Docker for Testcontainers
     cd apps/web && yarn test
     cd apps/web && yarn lint
+    cd apps/web && yarn format:check
 
 ## Current state
 

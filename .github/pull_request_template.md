@@ -13,7 +13,7 @@ Closes #
 - [ ] Links its issue (`Closes #N`)
 - [ ] Build and tests pass for each affected application
   - backend: `mvn -f services/core/pom.xml verify`
-  - frontend: `yarn test`, `yarn lint` and `yarn build` in `apps/web`
+  - frontend: `yarn test`, `yarn lint`, `yarn format:check` and `yarn build` in `apps/web`
 - [ ] No secrets, model keys or credentials committed
 
 ### If applicable
