@@ -34,16 +34,20 @@ A feature uses only the subdirectories it needs.
 
 ## Conventions
 
-- **Data fetching** is a hand-rolled hook per request (`useGames`, `useGame`)
-  built on `getJson` from `lib/api.ts`, not a query library. Hooks return a
-  discriminated union of states, abort their request on change or unmount, and
-  expose `retry`. Follow the existing hooks' shape when adding one.
+- **Data fetching** is a hand-rolled hook per request built on `getJson` from
+  `lib/api.ts`, not a query library. Every hook returns a discriminated union
+  of states. `useGames` and `useGame` are the model for a new hook: they also
+  abort their request when its inputs change or the component unmounts, and
+  expose `retry`. `useBackendHealth` is simpler — a single check on mount, with
+  nothing to retry or cancel — and is not the pattern to copy.
 - **Styling** is CSS Modules: `Component.module.css` beside `Component.tsx`.
   Colours, fonts and shadows come from the custom properties in `index.css`,
   which also defines their dark-scheme values; add a token there rather than
   hard-coding a colour in a module.
-- **API types** are written by hand in each feature's `types/` until #27
-  generates them from the backend's OpenAPI specification. The backend is
+- **API types** are written by hand until #27 generates them from the
+  backend's OpenAPI specification. They go in the feature's `types/` (as in
+  `games`), unless the feature has a single small response shape, which can sit
+  beside its request in `api/` (as in `system-health`). The backend is
   authoritative — keep them in step with its DTOs.
 - **Chess logic** that decides canonical state belongs to the backend. The
   frontend uses `chess.js` only to replay moves the backend has already
