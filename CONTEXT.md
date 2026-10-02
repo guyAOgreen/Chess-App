@@ -264,27 +264,34 @@ A GameImport is temporary/workflow-oriented.
 
 A Game is canonical.
 
-Possible lifecycle:
+Lifecycle:
 
 ```text
-UPLOADED
-   ↓
-PROCESSING
-   ↓
-READY_FOR_REVIEW
-   ↓
-CONFIRMED
-   ↓
-Game created
+UPLOADED → PROCESSING → READY_FOR_REVIEW → CONFIRMED
+               └──────→ FAILED
 ```
 
-Failure may transition to:
+| From | Allowed to |
+|---|---|
+| `UPLOADED` | `PROCESSING` |
+| `PROCESSING` | `READY_FOR_REVIEW`, `FAILED` |
+| `READY_FOR_REVIEW` | `CONFIRMED` |
+| `CONFIRMED` | none (terminal) |
+| `FAILED` | none (terminal) |
 
-```text
-FAILED
-```
+Every other transition is rejected, including repeating the current state.
 
-The exact state machine should be designed when implementing the workflow.
+* `UPLOADED`: the source has been accepted and durably recorded. Rejected
+  uploads never create an import.
+* `READY_FOR_REVIEW`: processing produced a reviewable result. It does not mean
+  the moves are legal, complete or unambiguous. Those issues are reviewed and
+  corrected here, and do not fail the import.
+* `CONFIRMED`: the reviewed result has become a canonical Game. Confirmation and
+  Game creation commit together.
+* `FAILED`: no reviewable result could be produced. It is terminal, so the user
+  starts a new import.
+
+Design: `docs/superpowers/specs/2026-10-01-game-import-state-machine-design.md`.
 
 ---
 

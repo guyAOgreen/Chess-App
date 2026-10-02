@@ -27,6 +27,42 @@ public record GameImport(UUID id, GameImportStatus status, String failureReason)
         failureReason = failureReason(status, failureReason);
     }
 
+    /** {@code UPLOADED → PROCESSING}. */
+    public GameImport startProcessing() {
+        return transitionTo(GameImportStatus.PROCESSING, null);
+    }
+
+    /** {@code PROCESSING → READY_FOR_REVIEW}: a reviewable result exists, not necessarily a legal one. */
+    public GameImport markReadyForReview() {
+        return transitionTo(GameImportStatus.READY_FOR_REVIEW, null);
+    }
+
+    /** {@code PROCESSING → FAILED}: no reviewable result could be produced. */
+    public GameImport fail(String reason) {
+        return transitionTo(GameImportStatus.FAILED, reason);
+    }
+
+    /**
+     * {@code READY_FOR_REVIEW → CONFIRMED}. This only changes the import's
+     * status; creating the {@code Game} from the reviewed moves is the
+     * confirmation use case's job (#18), in the same transaction.
+     */
+    public GameImport confirm() {
+        return transitionTo(GameImportStatus.CONFIRMED, null);
+    }
+
+    /**
+     * Checks the transition before building the next snapshot, so an illegal
+     * transition is reported even when the accompanying reason is also invalid.
+     * The returned value is a proposed next snapshot; it persists nothing.
+     */
+    private GameImport transitionTo(GameImportStatus next, String reason) {
+        if (!status.canTransitionTo(next)) {
+            throw new InvalidGameImportTransition(status, next);
+        }
+        return new GameImport(id, next, reason);
+    }
+
     /**
      * A non-failed import with any reason, even a blank one, is rejected rather
      * than normalised: it signals a stale or corrupt value, not an absent one.
