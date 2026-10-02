@@ -78,10 +78,12 @@ public record GameImport(UUID id, GameImportStatus status, String failureReason)
         if (raw == null) {
             throw new IllegalArgumentException("failureReason is required when status is FAILED");
         }
-        String trimmed = raw.trim();
-        if (trimmed.isEmpty()) {
+        // strip(), not trim(): trim() leaves Unicode whitespace such as U+2003 in
+        // place, which would let a visually blank reason through.
+        String stripped = raw.strip();
+        if (stripped.isEmpty()) {
             throw new IllegalArgumentException("failureReason must not be blank");
         }
-        return trimmed;
+        return stripped;
     }
 }
