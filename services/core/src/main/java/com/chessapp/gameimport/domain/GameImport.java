@@ -1,6 +1,7 @@
 package com.chessapp.gameimport.domain;
 
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 /**
  * An attempt to create a game from a source that needs processing and review,
@@ -13,7 +14,9 @@ import java.util.UUID;
  *
  * <p>{@code failureReason} is present exactly when the status is
  * {@link GameImportStatus#FAILED}. It is an application-controlled explanation,
- * never a raw provider response or exception message.
+ * never a raw provider response or exception message, and must contain a letter
+ * or digit: a reason made only of spaces, invisible characters or punctuation
+ * explains nothing.
  */
 public record GameImport(UUID id, GameImportStatus status, String failureReason) {
 
@@ -78,12 +81,19 @@ public record GameImport(UUID id, GameImportStatus status, String failureReason)
         if (raw == null) {
             throw new IllegalArgumentException("failureReason is required when status is FAILED");
         }
-        // strip(), not trim(): trim() leaves Unicode whitespace such as U+2003 in
-        // place, which would let a visually blank reason through.
-        String stripped = raw.strip();
-        if (stripped.isEmpty()) {
-            throw new IllegalArgumentException("failureReason must not be blank");
+        String stripped = EDGE_INVISIBLES.matcher(raw).replaceAll("");
+        if (stripped.codePoints().noneMatch(Character::isLetterOrDigit)) {
+            throw new IllegalArgumentException(
+                    "failureReason must contain a letter or digit; a failure must say why");
         }
         return stripped;
     }
+
+    /**
+     * Separators, controls and format characters at either end. Broader than
+     * {@link String#strip()}, which keeps no-break spaces (U+00A0, U+2007, U+202F)
+     * and zero-width characters such as U+200B and U+FEFF.
+     */
+    private static final Pattern EDGE_INVISIBLES =
+            Pattern.compile("^[\\p{Z}\\p{Cc}\\p{Cf}]+|[\\p{Z}\\p{Cc}\\p{Cf}]+$");
 }

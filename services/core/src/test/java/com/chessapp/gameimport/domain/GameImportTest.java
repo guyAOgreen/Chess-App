@@ -51,14 +51,14 @@ class GameImportTest {
 
     @Test
     void trimsTheReasonOfAFailedImport() {
-        GameImport gameImport = new GameImport(ID, FAILED, "  scoresheet unreadable \n");
+        GameImport gameImport = new GameImport(ID, FAILED, "\u00A0\u200B scoresheet unreadable \u202F\n");
 
         assertThat(gameImport.failureReason()).isEqualTo("scoresheet unreadable");
     }
 
     @ParameterizedTest
     @NullAndEmptySource
-    @ValueSource(strings = {"   ", "\t\n", " ", "　 "})
+    @ValueSource(strings = {"   ", "\t\n", "\u2003", "\u3000 ", "\u00A0", "\u2007\u202F", "\u200B", "\uFEFF", "--"})
     void rejectsAFailedImportWithoutAReasonSoAFailureAlwaysSaysWhy(String reason) {
         assertThatThrownBy(() -> new GameImport(ID, FAILED, reason))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -126,7 +126,7 @@ class GameImportTest {
 
     @ParameterizedTest
     @NullAndEmptySource
-    @ValueSource(strings = {"   ", " "})
+    @ValueSource(strings = {"   ", "\u2003", "\u00A0", "\u200B"})
     void failRequiresAReasonSoAFailureAlwaysSaysWhy(String reason) {
         assertThatThrownBy(() -> inStatus(PROCESSING).fail(reason))
                 .isInstanceOf(IllegalArgumentException.class)

@@ -133,6 +133,12 @@ The constructor normalises a valid failure reason in the same way as `fail`.
 Null, empty and whitespace-only reasons are rejected for `FAILED`. Even a blank
 non-null reason is rejected for other statuses.
 
+"Non-blank" means the reason contains at least one letter or digit. "Trimmed"
+removes Unicode space separators, control characters and format characters
+(`\p{Z}`, `\p{Cc}`, `\p{Cf}`) from both ends. `String.trim()` and `strip()` are
+not enough. Both keep no-break spaces and zero-width characters, so a reason
+made only of those would look blank and still be accepted.
+
 A failed import always says why. A non-failed import never carries a stale
 reason. The reason is an application-controlled, safe explanation, not a raw
 provider response, stack trace or credential-bearing exception message. Detailed
