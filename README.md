@@ -70,6 +70,9 @@ SSL detail, because nothing authenticates callers yet.
     cd apps/web && yarn lint
     cd apps/web && yarn format:check
 
+GitHub Actions runs the same checks on every pull request and on pushes to
+`master` (`.github/workflows/ci.yml`).
+
 ## Current state
 
 Progress is tracked by

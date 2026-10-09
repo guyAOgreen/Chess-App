@@ -1,0 +1,57 @@
+# Runs the same checks the pull request template asks contributors to run
+# locally, so a PR cannot merge green with a failing build, test, lint or
+# format check. Both jobs run on every PR regardless of which side changed:
+# simpler than path filters, and required status checks misbehave with jobs
+# that are skipped rather than run.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+# A new push to the same branch supersedes any run still in progress.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (mvn verify)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # cache: maven keys ~/.m2/repository on the pom hash. ADR 0001 accepted
+      # JitPack for chesslib on the condition that CI caches the Maven
+      # repository so builds do not hit JitPack every run.
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      # Docker is preinstalled on the Ubuntu runners, which is all the
+      # Testcontainers integration tests (*IT) need.
+      - run: mvn -B -f services/core/pom.xml verify
+
+  frontend:
+    name: Frontend (lint, format, test, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: yarn
+          cache-dependency-path: apps/web/yarn.lock
+
+      - run: yarn install --frozen-lockfile
+      - run: yarn lint
+      - run: yarn format:check
+      - run: yarn test
+      - run: yarn build
